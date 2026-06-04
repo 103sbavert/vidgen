@@ -65,24 +65,24 @@ CODEC_EXT = {
 }
 
 # 4-color pastel palette: powder blue, blush peach, soft mauve, seafoam mint
-DEFAULT_COLORS = ["AED9E0", "FAD4C0", "CDB4DB", "B5E8D5"]
+DEFAULT_COLORS = ["546B41", "99AD7A", "DCCCAC", "FFF8EC"]
 
 DEFAULTS = {
-    "output":        None,
-    "resolution":    "1280x720",
-    "framerate":     30,
-    "bitrate":       "2M",
-    "codec":         "libx264",
-    "duration":      10,
-    "text":          None,
-    "nb_colors":     4,
-    "speed":         0.08,
+    "output": None,
+    "resolution": "1920x1080",
+    "framerate": 24,
+    "bitrate": "8M",
+    "codec": "libx264",
+    "duration": 30,
+    "text": None,
+    "nb_colors": 4,
+    "speed": 0.08,
     "gradient_type": "linear",
-    "linear_angle":  0,
-    "seed":          None,
-    "font_size":     None,
-    "font_color":    "black",
-    "colors":        DEFAULT_COLORS,
+    "linear_angle": 0,
+    "seed": None,
+    "font_size": None,
+    "font_color": "black",
+    "colors": ["546B41", "99AD7A", "DCCCAC", "FFF8EC"],
 }
 
 
