@@ -8,9 +8,13 @@ Usage:
 """
 
 import argparse
+from email.charset import CODEC_MAP
 import json
 import math
 import os
+from os import path
+from pathlib import Path
+from plistlib import InvalidFileException
 import subprocess
 import sys
 import tempfile
@@ -19,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from pathvalidate import is_valid_filepath
 
 _WORKERS = max(1, int((os.cpu_count() or 1) * 0.75))
 PARALLEL_WINDOW = _WORKERS * 2  # max frames rendered ahead of FFmpeg writer
@@ -103,6 +108,7 @@ def hex_to_rgb(h):
 
 def compute_base(width, height, gradient_type, linear_angle):
     """Precompute static spatial phase map (HxW float64). Phase is added per frame."""
+
     # Normalized coords in [0, 1]
     x = np.linspace(0, 1, width, endpoint=False)
     y = np.linspace(0, 1, height, endpoint=False)
@@ -225,28 +231,53 @@ def main():
         )
         sys.exit(1)
 
-    # Auto-generate output filename if not specified
-    if not cfg["output"]:
-        res = cfg["resolution"]
-        fps = cfg["framerate"]
-        br = cfg["bitrate"]
-        dur = int(cfg["duration"])
-        ext = CODEC_EXT.get(cfg["codec"], "mp4")
-        cfg["output"] = f"{res}_{fps}fps_{br}bps_{dur}s.{ext}"
-
+    res = cfg["resolution"]
+    br = cfg["bitrate"].lower()
+    ext = CODEC_EXT.get(cfg["codec"], "mp4")
     nb = cfg["nb_colors"]
+
     palette = cfg["colors"]
     colors_hex = (palette * ((nb // len(palette)) + 1))[:nb]
     colors_arr = np.array([hex_to_rgb(c) for c in colors_hex], dtype=np.float32)
 
+    duration = int(cfg["duration"])
+    framerate = cfg["framerate"]
     font_size = cfg["font_size"] if cfg["font_size"] else max(24, height // 12)
     small_size = max(14, height // 28)
     font = ImageFont.truetype(FONT_PATH, font_size)
     small_font = ImageFont.truetype(FONT_PATH, small_size)
-    framerate = cfg["framerate"]
-    duration = cfg["duration"]
     total_frames = int(framerate * duration)
     speed = cfg["speed"]
+
+    gen_path = f"{res}_{framerate}fps_{br}bps_{duration}s.{ext}"
+
+    # Auto-generate output filename if not specified
+    if not cfg["output"]:
+        cfg["output"] = gen_path
+    # or if specified path is a directory, save inside it using auto generated
+    elif path.isdir(cfg["output"]):
+        cfg["output"] = path.join(cfg["output"], gen_path)
+    # or if the value is not a valid file name or path, throw
+    elif not is_valid_filepath(cfg["output"]):
+        raise InvalidFileException(
+            f"The filename {cfg["output"]} us is not a valid filename"
+        )
+    # in the end throw if its an unsupported file extension
+    # TODO: the list of supported extensions should ideally match ffmpeg
+    # but I don't know all the file extensions ffmpeg supports right now
+    else:
+        p = Path(cfg["output"])
+        ext = p.suffix.lstrip(".")  # remove because dict doesn't have it either
+        if not ext:
+            raise InvalidFileException(
+                f"File name {p} does not specify a file extension"
+            )
+        elif ext not in list(CODEC_EXT.values()):
+            raise InvalidFileException(f"File extension {ext} is not supported")
+
+    cfg["output"] = path.expandvars(
+        path.expanduser(cfg["output"])
+    )  # allow env vars and shell characters like `.`, `~` and `..`
 
     # Determine overlay text
     custom_text = cfg["text"]

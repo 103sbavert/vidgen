@@ -25,7 +25,7 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `output` | string\|null | `null` | Output path. If `null`, auto-named `{res}_{fps}fps_{bitrate}bps_{duration}s.{ext}` where ext is inferred from codec. |
+| `output` | string\|null | `null` | Output path. If `null`, auto-named `{gradient_type}_{res}_{fps}fps_{bitrate}bps_{duration}s.{ext}`¹ where ext is inferred from codec.* |
 | `resolution` | string | `"1920x1080"` | Frame size as `WxH`. |
 | `framerate` | int | `24` | Frames per second. |
 | `bitrate` | string | `"8M"` | Video bitrate (`"500k"`, `"4M"`, etc.). |
@@ -36,12 +36,14 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 | `font_color` | string | `"black"` | Text color — HTML name or `#RRGGBB`. |
 | `gradient_type` | string | `"linear"` | One of: `linear`, `radial`, `circular`, `spiral`, `square`. |
 | `linear_angle` | float | `0` | Rotation of the `linear` gradient in degrees (0 = horizontal, 90 = vertical). Has no effect on other gradient types. |
-| `colors` | string[] | pastel palette¹ | List of hex color strings (without `#`). |
+| `colors` | string[] | pastel palette² | List of hex color strings (without `#`). |
 | `nb_colors` | int | `4` | How many colors to use from `colors`. Cycles if fewer than requested. |
 | `speed` | float | `0.08` | Animation speed in color-cycles per second. |
 | `seed` | — | `null` | Reserved, currently unused. |
 
-¹ Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
+¹ Environment variables and shell metacharacters characters are expanded if a value is specified. If the value points to a directory that exists on the system, the file is created inside that directory using the auto-generated path.
+
+² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
 
 ![palette](palette.png)
 

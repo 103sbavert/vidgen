@@ -8,7 +8,7 @@
     "text": null,
     "nb_colors": 4,
     "speed": 0.08,
-    "gradient_type": "linear",
+    "gradient_type": "radial",
     "linear_angle": 0,
     "seed": null,
     "font_size": null,
