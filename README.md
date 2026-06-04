@@ -42,6 +42,7 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 | `seed` | — | `null` | Reserved, currently unused. |
 
 ¹ Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
+
 ![palette](palette.png)
 
 ### Gradient types

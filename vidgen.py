@@ -102,7 +102,7 @@ def hex_to_rgb(h):
 
 
 def compute_base(width, height, gradient_type, linear_angle):
-    """Precompute static spatial phase map (H×W float64). Phase is added per frame."""
+    """Precompute static spatial phase map (HxW float64). Phase is added per frame."""
     # Normalized coords in [0, 1]
     x = np.linspace(0, 1, width, endpoint=False)
     y = np.linspace(0, 1, height, endpoint=False)
@@ -145,11 +145,11 @@ def compute_base(width, height, gradient_type, linear_angle):
 
 
 def phase_to_rgb(t_mod1, colors_arr):
-    """Map H×W phase array [0,1) to H×W×3 uint8 RGB."""
+    """Map HxW phase array [0,1) to HxWx3 uint8 RGB."""
     n = len(colors_arr)
     scaled = t_mod1 * n
     idx = scaled.astype(np.int32) % n
-    frac = (scaled - np.floor(scaled))[..., np.newaxis]  # H×W×1
+    frac = (scaled - np.floor(scaled))[..., np.newaxis]  # HxWx1
     c0 = colors_arr[idx]
     c1 = colors_arr[(idx + 1) % n]
     return np.clip(c0 * (1 - frac) + c1 * frac, 0, 255).astype(np.uint8)
