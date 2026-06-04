@@ -30,26 +30,38 @@ import math
 import os
 import subprocess
 import sys
+import tempfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-_WORKERS = max(1, int(os.cpu_count() * 0.75))
+_WORKERS = max(1, int((os.cpu_count() or 1) * 0.75))
 PARALLEL_WINDOW = _WORKERS * 2  # max frames rendered ahead of FFmpeg writer
 
 
 GRADIENT_TYPES = ("linear", "radial", "circular", "spiral", "square")
-FONT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "NotoSans-Regular.ttf")
+FONT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "fonts", "NotoSans-Regular.ttf"
+)
 
 CODEC_EXT = {
-    "libx264": "mp4", "libx265": "mp4", "h264": "mp4", "hevc": "mp4",
-    "libvpx-vp9": "webm", "libvpx": "webm", "vp9": "webm", "vp8": "webm",
-    "libaom-av1": "mkv", "av1": "mkv",
-    "prores": "mov", "prores_ks": "mov",
+    "libx264": "mp4",
+    "libx265": "mp4",
+    "h264": "mp4",
+    "hevc": "mp4",
+    "libvpx-vp9": "webm",
+    "libvpx": "webm",
+    "vp9": "webm",
+    "vp8": "webm",
+    "libaom-av1": "mkv",
+    "av1": "mkv",
+    "prores": "mov",
+    "prores_ks": "mov",
     "dnxhd": "mxf",
-    "huffyuv": "avi", "rawvideo": "avi",
+    "huffyuv": "avi",
+    "rawvideo": "avi",
 }
 
 # 4-color pastel palette: powder blue, blush peach, soft mauve, seafoam mint
@@ -92,22 +104,28 @@ def parse_args():
     p = argparse.ArgumentParser(
         description="Generate a video with animated gradient background and text overlay.",
     )
-    p.add_argument("-c", "--config", metavar="FILE",
-                   help="Path to JSON config file. Missing or null keys use defaults.")
+    p.add_argument(
+        "-c",
+        "--config",
+        metavar="FILE",
+        help="Path to JSON config file. Missing or null keys use defaults.",
+    )
     return p.parse_args()
 
 
 def hex_to_rgb(h):
     h = h.lstrip("#").lstrip("0x").lstrip("0X")
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def compute_base(width, height, gradient_type, linear_angle):
     """Precompute static spatial phase map (H×W float64). Phase is added per frame."""
     # Normalized coords in [0, 1]
-    x = np.linspace(0, 1, width,  endpoint=False)
+    x = np.linspace(0, 1, width, endpoint=False)
     y = np.linspace(0, 1, height, endpoint=False)
     XX, YY = np.meshgrid(x, y)
+
+    t = np.zeros_like(XX)
 
     if gradient_type == "linear":
         a = math.radians(linear_angle)
@@ -136,8 +154,8 @@ def compute_base(width, height, gradient_type, linear_angle):
 
     elif gradient_type == "square":
         # Chebyshev distance from center → concentric squares expand outward
-        DX = np.abs(XX - 0.5) * 2   # [0, 1]
-        DY = np.abs(YY - 0.5) * 2   # [0, 1]
+        DX = np.abs(XX - 0.5) * 2  # [0, 1]
+        DY = np.abs(YY - 0.5) * 2  # [0, 1]
         t = np.maximum(DX, DY)
 
     return t
@@ -154,6 +172,58 @@ def phase_to_rgb(t_mod1, colors_arr):
     return np.clip(c0 * (1 - frac) + c1 * frac, 0, 255).astype(np.uint8)
 
 
+def render_via_stdin(proc, render_frame, total_frames):
+    """Stream frames directly to FFmpeg via stdin."""
+    try:
+        with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
+            pending = deque()
+            for i in range(total_frames):
+                if len(pending) >= PARALLEL_WINDOW:
+                    proc.stdin.write(pending.popleft().result().tobytes())
+                pending.append(pool.submit(render_frame, i))
+            for fut in pending:
+                proc.stdin.write(fut.result().tobytes())
+    except BrokenPipeError:
+        pass
+    finally:
+        proc.stdin.close()
+
+    return proc.wait()
+
+
+def render_via_tempfiles(cfg, render_frame, total_frames, framerate):
+    """Render frames to temp directory, then encode with FFmpeg."""
+    print("Warning: stdin unavailable, using temp files", file=sys.stderr)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        print(f"Rendering {total_frames} frames to {tmp_dir}...", file=sys.stderr)
+
+        with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
+            futures = [pool.submit(render_frame, i) for i in range(total_frames)]
+            for i, fut in enumerate(futures):
+                img = fut.result()
+                img.save(os.path.join(tmp_dir, f"frame_{i:05d}.png"))
+
+        print("Encoding video from temp files...", file=sys.stderr)
+        ffmpeg_cmd_files = [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(framerate),
+            "-i",
+            os.path.join(tmp_dir, "frame_%05d.png"),
+            "-vcodec",
+            cfg["codec"],
+            "-b:v",
+            cfg["bitrate"],
+            "-t",
+            str(cfg["duration"]),
+            cfg["output"],
+        ]
+        result = subprocess.run(ffmpeg_cmd_files)
+        return result.returncode
+
+
 def main():
     args = parse_args()
     cfg = load_config(args.config) if args.config else dict(DEFAULTS)
@@ -166,7 +236,10 @@ def main():
         w_str, h_str = cfg["resolution"].lower().split("x")
         width, height = int(w_str), int(h_str)
     except ValueError:
-        print(f"Error: invalid resolution '{cfg['resolution']}' — expected WxH (e.g. 1280x720)", file=sys.stderr)
+        print(
+            f"Error: invalid resolution '{cfg['resolution']}' — expected WxH (e.g. 1280x720)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Auto-generate output filename if not specified
@@ -187,8 +260,8 @@ def main():
     small_size = max(14, height // 28)
     font = ImageFont.truetype(FONT_PATH, font_size)
     small_font = ImageFont.truetype(FONT_PATH, small_size)
-    framerate  = cfg["framerate"]
-    duration   = cfg["duration"]
+    framerate = cfg["framerate"]
+    duration = cfg["duration"]
     total_frames = int(framerate * duration)
     speed = cfg["speed"]
 
@@ -196,7 +269,7 @@ def main():
     custom_text = cfg["text"]
     if custom_text is not None:
         # Single centered text block
-        overlay_lines = None
+        overlay_lines = []
     else:
         # Metadata overlay: one line per stat, rendered in small font
         output_path = cfg["output"]
@@ -210,7 +283,9 @@ def main():
         ]
 
     # Precompute static spatial component once; add scalar phase per frame
-    t_base = compute_base(width, height, cfg["gradient_type"], cfg.get("linear_angle", 0))
+    t_base = compute_base(
+        width, height, cfg["gradient_type"], cfg.get("linear_angle", 0)
+    )
 
     # Precompute text position(s)
     dummy_img = Image.new("RGB", (width, height))
@@ -219,7 +294,7 @@ def main():
 
     if custom_text is not None:
         bbox = dummy_draw.textbbox((0, 0), custom_text, font=font)
-        text_x = (width  - (bbox[2] - bbox[0])) // 2
+        text_x = (width - (bbox[2] - bbox[0])) // 2
         text_y = (height - (bbox[3] - bbox[1])) // 2
         text_positions = [(custom_text, font, text_x, text_y)]
     else:
@@ -235,14 +310,24 @@ def main():
             text_positions.append((line, small_font, lx, ly))
 
     ffmpeg_cmd = [
-        "ffmpeg", "-y",
-        "-f", "rawvideo", "-pixel_format", "rgb24",
-        "-video_size", f"{width}x{height}",
-        "-framerate", str(framerate),
-        "-i", "pipe:0",
-        "-vcodec", cfg["codec"],
-        "-b:v", cfg["bitrate"],
-        "-t", str(duration),
+        "ffmpeg",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pixel_format",
+        "rgb24",
+        "-video_size",
+        f"{width}x{height}",
+        "-framerate",
+        str(framerate),
+        "-i",
+        "pipe:0",
+        "-vcodec",
+        cfg["codec"],
+        "-b:v",
+        cfg["bitrate"],
+        "-t",
+        str(duration),
         cfg["output"],
     ]
 
@@ -254,25 +339,17 @@ def main():
         rgb_arr = phase_to_rgb(t, colors_arr)
         img = Image.fromarray(rgb_arr, "RGB")
         draw = ImageDraw.Draw(img)
-        for (line, fnt, lx, ly) in text_positions:
+        for line, fnt, lx, ly in text_positions:
             draw.text((lx, ly), line, font=fnt, fill=font_color)
-        return img.tobytes()
+        return img
 
-    try:
-        with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
-            pending = deque()
-            for i in range(total_frames):
-                if len(pending) >= PARALLEL_WINDOW:
-                    proc.stdin.write(pending.popleft().result())
-                pending.append(pool.submit(render_frame, i))
-            for fut in pending:
-                proc.stdin.write(fut.result())
-    except BrokenPipeError:
-        pass
-    finally:
-        proc.stdin.close()
+    if proc.stdin:
+        exit_code = render_via_stdin(proc, render_frame, total_frames)
+    else:
+        proc.kill()
+        exit_code = render_via_tempfiles(cfg, render_frame, total_frames, framerate)
 
-    sys.exit(proc.wait())
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
