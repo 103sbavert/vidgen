@@ -74,3 +74,9 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 Each frame is generated in Python using **numpy** (vectorized gradient math) and **Pillow** (image + text rendering), then piped as raw RGB24 bytes to **FFmpeg** for encoding. The gradient phase map is precomputed once; per frame only a scalar offset is added — making generation fast regardless of resolution. Frames are rendered in parallel using a thread pool (up to 30 frames ahead) to saturate available CPU cores.
 
 The font (NotoSans) is bundled in `fonts/` and requires no system installation.
+
+## Note on AI usage
+
+The code in this repository was generated using AI until ref [87a13eb](https://github.com/103sbavert/vidgen/releases/tag/no-ai). All code from here onwards will be manually implemented, although asking AI for help as an assistance tool may still be done.
+
+The key distinction is that every new line of code in this repository after said ref will be typed using a physical keyboard.
