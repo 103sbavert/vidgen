@@ -1,0 +1,17 @@
+{
+    "output": null,
+    "resolution": "1280x720",
+    "framerate": 30,
+    "bitrate": "2M",
+    "codec": "libx264",
+    "duration": 10,
+    "text": null,
+    "nb_colors": 4,
+    "speed": 0.08,
+    "gradient_type": "linear",
+    "linear_angle": 0,
+    "seed": null,
+    "font_size": null,
+    "font_color": "black",
+    "colors": ["AED9E0", "FAD4C0", "CDB4DB", "B5E8D5"]
+}
