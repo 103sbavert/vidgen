@@ -233,6 +233,7 @@ def main():
 
     res = cfg["resolution"]
     br = cfg["bitrate"].lower()
+    gt = cfg["gradient_type"]
     ext = CODEC_EXT.get(cfg["codec"], "mp4")
     nb = cfg["nb_colors"]
 
@@ -249,7 +250,7 @@ def main():
     total_frames = int(framerate * duration)
     speed = cfg["speed"]
 
-    gen_path = f"{res}_{framerate}fps_{br}bps_{duration}s.{ext}"
+    gen_path = f"{gt}_{res}_{framerate}fps_{br}bps_{duration}s.{ext}"
 
     # Auto-generate output filename if not specified
     if not cfg["output"]:
