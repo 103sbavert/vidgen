@@ -1,10 +1,10 @@
 {
     "output": null,
-    "resolution": "1280x720",
-    "framerate": 30,
-    "bitrate": "2M",
+    "resolution": "1920x1080",
+    "framerate": 24,
+    "bitrate": "8M",
     "codec": "libx264",
-    "duration": 10,
+    "duration": 30,
     "text": null,
     "nb_colors": 4,
     "speed": 0.08,
@@ -13,5 +13,5 @@
     "seed": null,
     "font_size": null,
     "font_color": "black",
-    "colors": ["AED9E0", "FAD4C0", "CDB4DB", "B5E8D5"]
+    "colors": ["546B41", "99AD7A", "DCCCAC", "FFF8EC"]
 }
