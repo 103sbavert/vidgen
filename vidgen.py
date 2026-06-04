@@ -5,23 +5,6 @@ vidgen.py — Generate a video with animated gradient background and static text
 Usage:
     python vidgen.py                    # uses all defaults, outputs out.mp4
     python vidgen.py -c config.json     # uses config file (missing/null keys use defaults)
-
-JSON config keys (all optional, null uses default):
-    output          str    null             Output file; null = auto-named {res}_{fps}fps_{bitrate}bps_{duration}s.{ext}
-    resolution      str    "1280x720"       WxH
-    framerate       int    30               FPS
-    bitrate         str    "2M"             Video bitrate (e.g. "500k", "4M")
-    codec           str    "libx264"        FFmpeg video codec
-    duration        float  10               Seconds
-    text            str    null             Static text overlay; if null, shows video metadata
-    nb_colors       int    4                Colors in gradient (2-8)
-    speed           float  0.08             Animation speed (color-cycles per second)
-    gradient_type   str    "linear"         linear / radial / circular / spiral / square
-    linear_angle    float  0                Degrees for linear gradient (0=horizontal, 90=vertical); ignored for other types
-    seed            null                    Reserved (colors are explicit; ignored)
-    font_size       int    null             Font size in pixels; null = auto-scale from height (height/12)
-    font_color      str    "black"          Text color (HTML name or #RRGGBB)
-    colors          list   [...]            Hex color strings (without #)
 """
 
 import argparse

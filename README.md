@@ -26,11 +26,11 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `output` | string\|null | `null` | Output path. If `null`, auto-named `{res}_{fps}fps_{bitrate}bps_{duration}s.{ext}` where ext is inferred from codec. |
-| `resolution` | string | `"1280x720"` | Frame size as `WxH`. |
-| `framerate` | int | `30` | Frames per second. |
-| `bitrate` | string | `"2M"` | Video bitrate (`"500k"`, `"4M"`, etc.). |
+| `resolution` | string | `"1920x1080"` | Frame size as `WxH`. |
+| `framerate` | int | `24` | Frames per second. |
+| `bitrate` | string | `"8M"` | Video bitrate (`"500k"`, `"4M"`, etc.). |
 | `codec` | string | `"libx264"` | FFmpeg video codec. See codec table below. |
-| `duration` | float | `10` | Length in seconds. |
+| `duration` | float | `30` | Length in seconds. |
 | `text` | string\|null | `null` | Static text overlay. If `null`, shows video metadata (resolution, fps, format, codec, duration). |
 | `font_size` | int\|null | `null` | Font size in pixels. If `null`, auto-scaled to `height / 12` (e.g. 60px at 720p). |
 | `font_color` | string | `"black"` | Text color — HTML name or `#RRGGBB`. |
@@ -41,7 +41,8 @@ The only CLI option is `-c`/`--config`, pointing to a JSON file. All keys are op
 | `speed` | float | `0.08` | Animation speed in color-cycles per second. |
 | `seed` | — | `null` | Reserved, currently unused. |
 
-¹ Default palette: `AED9E0` (powder blue), `FAD4C0` (blush peach), `CDB4DB` (soft mauve), `B5E8D5` (seafoam mint).
+¹ Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
+![palette](palette.png)
 
 ### Gradient types
 
