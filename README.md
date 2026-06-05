@@ -2,6 +2,9 @@
 
 Generates synthetic test videos with animated gradient backgrounds and a text overlay.
 
+> [!IMPORTANT]
+> This branch is under a re-write in Go.
+
 ## Requirements
 
 - Python 3.x
