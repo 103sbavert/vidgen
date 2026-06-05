@@ -8,9 +8,7 @@ import (
 )
 
 func main() {
-	argument_list := os.Args
-
-	if len(argument_list) > 2 {
+	if len(os.Args) > 2 {
 		fmt.Println("Unknown arguments specified")
 		os.Exit(1)
 	}
