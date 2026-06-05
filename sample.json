@@ -2,7 +2,7 @@
     "output": null,
     "resolution": "1920x1080",
     "framerate": 24,
-    "bitrate": "8M",
+    "bitrate": 2097152,
     "codec": "libx264",
     "duration": 30,
     "text": null,
