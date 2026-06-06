@@ -33,7 +33,7 @@ func (r *VideoResolution) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Color) UnmarshalJSON(data []byte) error {
+func (c *Color) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
@@ -48,6 +48,6 @@ func (r *Color) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid color: %s", s)
 	}
 
-	*r = Color(s)
+	*c = Color(s)
 	return nil
 }
