@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sbavert/vidgen/configuration"
+	"sbavert/vidgen/config"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var config = configuration.LoadJsonFile(&abs_config_path)
+	var config = config.LoadJsonFile(&abs_config_path)
 
 	fmt.Println(config)
 
