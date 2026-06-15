@@ -4,10 +4,38 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 func (c *VideoConfig) GetAutomaticFilename() string {
 	return fmt.Sprintf("output_%s_%s_%s_%dfps_%bps", c.GradientType, *c.Output, c.Resolution, c.Framerate, c.Bitrate)
+}
+
+func (c Color) ParseHex() (r, g, b uint8, err error) {
+	r_hex := string(c[0:2])
+	g_hex := string(c[2:4])
+	b_hex := string(c[4:6])
+
+	r_uint, err := strconv.ParseUint(r_hex, 16, 8)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid red hex: %w", err)
+	}
+
+	g_uint, err := strconv.ParseUint(g_hex, 16, 8)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid green hex: %w", err)
+	}
+
+	b_uint, err := strconv.ParseUint(b_hex, 16, 8)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid blue hex: %w", err)
+	}
+
+	r = uint8(r_uint)
+	g = uint8(g_uint)
+	b = uint8(b_uint)
+
+	return r, g, b, nil
 }
 
 func LoadJsonFile(configPath *string) VideoConfig {
