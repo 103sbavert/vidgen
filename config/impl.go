@@ -18,17 +18,17 @@ func (c Color) ParseHex() (r, g, b uint8, err error) {
 
 	r_uint, err := strconv.ParseUint(r_hex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid red hex: %w", err)
+		return 0, 0, 0, fmt.Errorf("invalid red hex %s: %w", r_hex, err)
 	}
 
 	g_uint, err := strconv.ParseUint(g_hex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid green hex: %w", err)
+		return 0, 0, 0, fmt.Errorf("invalid green hex %s: %w", g_hex, err)
 	}
 
 	b_uint, err := strconv.ParseUint(b_hex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid blue hex: %w", err)
+		return 0, 0, 0, fmt.Errorf("invalid blue hex %s: %w", b_hex, err)
 	}
 
 	r = uint8(r_uint)
