@@ -7,6 +7,10 @@ import (
 	"sbavert/vidgen/config"
 )
 
+// smoothstepSigma is the half-width of the fuzzy transition zone around each
+// ring boundary fence (see buildSmoothstepTerm).
+const smoothstepSigma = 0.05
+
 // ringWidth returns the initial fractional width of one ring on the 0→1 radius ruler.
 // Colors in config are ordered outermost-first, so n=0 is the widest ring.
 //
@@ -88,11 +92,11 @@ func colorDeltas(colors []config.Color) (deltas [][3]int16, errorList []error) {
 		outerR, outerG, outerB, errOuter := outerColor.ParseHex()
 
 		if errInner != nil {
-			errorList = append(errorList, fmt.Errorf("coud not parse ring color %s at position %d: %w", innerColor, i+1, errInner))
+			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", innerColor, i+1, errInner))
 		}
 
 		if errOuter != nil {
-			errorList = append(errorList, fmt.Errorf("coud not parse ring color %s at position %d: %w", outerColor, i, errOuter))
+			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", outerColor, i, errOuter))
 		}
 
 		if errInner != nil || errOuter != nil {
@@ -172,7 +176,7 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 	expr.WriteString("st(0,hypot(X-W/2,Y-H/2)/hypot(W/2,H/2));")
 
 	// Store progress through clip (0 -> 1)
-	fmt.Fprintf(&expr, "st(1,T/%d);", duration)
+	fmt.Fprintf(&expr, "st(1,T/%d.0);", duration)
 	// t = clamp((d - fence + sigma) / (2*sigma), 0, 1)
 	// s = t*t*(3-2*t)
 	// contribution = delta * s
@@ -193,10 +197,11 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 	fmt.Fprintf(&expr, "%d", baseVal)
 
 	// Add each fence's contribution
-	// Fence k is in slot k+1, temp smoothstep value goes in slot 5 (reused)
+	// Fence k is in slot k+1, temp smoothstep value goes in slot N+1 (reused,
+	// always past the last fence slot N)
 	for k := 1; k < N; k++ {
 		boundarySlot := k + 1
-		tempSlot := 5
+		tempSlot := N + 1
 		delta := int(deltas[k-1])
 		expr.WriteString(buildSmoothstepTerm(boundarySlot, tempSlot, delta, sigma))
 	}
@@ -251,7 +256,7 @@ func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
 		deltaB = append(deltaB, d[2])
 	}
 
-	sigma := 0.05
+	sigma := smoothstepSigma
 
 	// Build each channel expression
 	rExpr := buildChannelExpr(int(innerR), deltaR, N, sigma, cfg.Duration)
