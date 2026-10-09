@@ -8,10 +8,18 @@ import (
 )
 
 func (c *VideoConfig) GetAutomaticFilename() string {
-	return fmt.Sprintf("output_%s_%s_%s_%dfps_%bps", c.GradientType, *c.Output, c.Resolution, c.Framerate, c.Bitrate)
+	ext := c.Codec.FormatExtension
+	if ext == "" {
+		ext = ExtMp4
+	}
+	return fmt.Sprintf("%s_%s_%dfps_%dbps_%ds%s", c.GradientType, c.Resolution, c.Framerate, c.Bitrate, c.Duration, ext)
 }
 
 func (c Color) ParseHex() (r, g, b uint8, err error) {
+	if len(c) != 6 {
+		return 0, 0, 0, fmt.Errorf("invalid hex color %q: must be 6 hex digits", string(c))
+	}
+
 	rHex := string(c[0:2])
 	gHex := string(c[2:4])
 	bHex := string(c[4:6])
@@ -53,5 +61,20 @@ func LoadJSONFile(configPath *string) VideoConfig {
 		os.Exit(1)
 	}
 
+	localConfig.cyclePalette()
+
 	return localConfig
+}
+
+// cyclePalette expands or truncates Colors to NbColors by cycling the palette.
+// NbColors wins over len(Colors); a non-positive NbColors leaves Colors as-is.
+func (c *VideoConfig) cyclePalette() {
+	if c.NbColors < 1 || len(c.Colors) == 0 || len(c.Colors) == c.NbColors {
+		return
+	}
+	cycled := make([]Color, c.NbColors)
+	for i := range cycled {
+		cycled[i] = c.Colors[i%len(c.Colors)]
+	}
+	c.Colors = cycled
 }

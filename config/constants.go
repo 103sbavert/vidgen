@@ -13,11 +13,13 @@ const (
 	ExtWebp = ".webp"
 )
 
+// DefaultConfig is the base configuration. Missing JSON keys keep these values;
+// running with no config file uses DefaultConfig as-is.
 var DefaultConfig = VideoConfig{
-	Resolution:   "1920x1080",
+	Resolution:   VideoResolution("1920x1080"),
 	Framerate:    24,
 	Bitrate:      2097152,
-	Codec:        "libx264",
+	Codec:        validCodecs["libx264"],
 	Duration:     30,
 	NbColors:     4,
 	Speed:        0.08,
