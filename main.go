@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
 	"sbavert/vidgen/config"
 )
 
@@ -13,16 +14,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	config_json_file := os.Args[1]
-	abs_config_path, err := filepath.Abs(config_json_file)
-
+	confPath := os.Args[1]
+	absConfPath, err := filepath.Abs(confPath)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	var config = config.LoadJsonFile(&abs_config_path)
+	config := config.LoadJSONFile(&absConfPath)
 
 	fmt.Println(config)
-
 }

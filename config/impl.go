@@ -12,46 +12,46 @@ func (c *VideoConfig) GetAutomaticFilename() string {
 }
 
 func (c Color) ParseHex() (r, g, b uint8, err error) {
-	r_hex := string(c[0:2])
-	g_hex := string(c[2:4])
-	b_hex := string(c[4:6])
+	rHex := string(c[0:2])
+	gHex := string(c[2:4])
+	bHex := string(c[4:6])
 
-	r_uint, err := strconv.ParseUint(r_hex, 16, 8)
+	rUint, err := strconv.ParseUint(rHex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid red hex %s: %w", r_hex, err)
+		return 0, 0, 0, fmt.Errorf("invalid red hex %s: %w", rHex, err)
 	}
 
-	g_uint, err := strconv.ParseUint(g_hex, 16, 8)
+	gUint, err := strconv.ParseUint(gHex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid green hex %s: %w", g_hex, err)
+		return 0, 0, 0, fmt.Errorf("invalid green hex %s: %w", gHex, err)
 	}
 
-	b_uint, err := strconv.ParseUint(b_hex, 16, 8)
+	bUint, err := strconv.ParseUint(bHex, 16, 8)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid blue hex %s: %w", b_hex, err)
+		return 0, 0, 0, fmt.Errorf("invalid blue hex %s: %w", bHex, err)
 	}
 
-	r = uint8(r_uint)
-	g = uint8(g_uint)
-	b = uint8(b_uint)
+	r = uint8(rUint)
+	g = uint8(gUint)
+	b = uint8(bUint)
 
 	return r, g, b, nil
 }
 
-func LoadJsonFile(configPath *string) VideoConfig {
-	local_config := defaultConfig
+func LoadJSONFile(configPath *string) VideoConfig {
+	localConfig := defaultConfig
 
-	file_bytes, err := os.ReadFile(*configPath)
+	bytes, err := os.ReadFile(*configPath)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	err = json.Unmarshal(file_bytes, &local_config)
+	err = json.Unmarshal(bytes, &localConfig)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	return local_config
+	return localConfig
 }
