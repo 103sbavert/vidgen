@@ -13,7 +13,7 @@ const (
 	ExtWebp = ".webp"
 )
 
-var defaultConfig = VideoConfig{
+var DefaultConfig = VideoConfig{
 	Resolution:   "1920x1080",
 	Framerate:    24,
 	Bitrate:      2097152,
