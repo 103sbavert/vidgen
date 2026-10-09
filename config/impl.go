@@ -47,7 +47,7 @@ func (c Color) ParseHex() (r, g, b uint8, err error) {
 }
 
 func LoadJSONFile(configPath *string) VideoConfig {
-	var localConfig VideoConfig
+	localConfig := DefaultConfig
 
 	bytes, err := os.ReadFile(*configPath)
 	if err != nil {
