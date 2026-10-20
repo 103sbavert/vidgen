@@ -27,13 +27,13 @@ func Render(cfg config.VideoConfig) error {
 		return fmt.Errorf("unsupported gradient type %q", cfg.GradientType)
 	}
 
-	return Run(BuildArgs(cfg, expr))
+	return run(buildArgs(cfg, expr))
 }
 
-// BuildArgs assembles the ffmpeg argv for a gradient clip. The gradient itself
+// buildArgs assembles the ffmpeg argv for a gradient clip. The gradient itself
 // comes from the geq filter expression; length lives in output -t only (the
 // nullsrc input is left endless). No shell is involved, so geq needs no quoting.
-func BuildArgs(cfg config.VideoConfig, geq string) []string {
+func buildArgs(cfg config.VideoConfig, geq string) []string {
 	fps := strconv.Itoa(cfg.Framerate)
 
 	return []string{
@@ -50,8 +50,8 @@ func BuildArgs(cfg config.VideoConfig, geq string) []string {
 	}
 }
 
-// Run executes argv (as built by BuildArgs) with output streamed to the console.
-func Run(argv []string) error {
+// run executes argv (as built by BuildArgs) with output streamed to the console.
+func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("no command to run")
 	}
