@@ -68,6 +68,9 @@ func (c Color) ParseHex() (r, g, b uint8, err error) {
 	return
 }
 
+// CalcOutputPath intelligently calculates and sets `VideoConfig.Output`. If a
+// value is set and a file at the resolved path exists, an error is thrown. An
+// automatic file name is determined.
 func (c VideoConfig) CalcOutputPath() error {
 	if c.Output == nil {
 		p := nextAvailableFilename(c)
