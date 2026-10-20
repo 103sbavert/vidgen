@@ -33,6 +33,7 @@ func GetDefaultConfig() VideoConfig {
 		LinearAngle:  0,
 		FontColor:    "black",
 		Colors:       []Color{"546b41", "99ad7a", "dcccac", "fff8ec"},
+		Engine:       "native",
 	}
 }
 

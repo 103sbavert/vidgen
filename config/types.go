@@ -22,6 +22,10 @@ type VideoConfig struct {
 	FontSize     *int            `json:"font_size" validate:"omitempty,gt=0"`
 	FontColor    Color           `json:"font_color" validate:"required,color"`
 	Colors       []Color         `json:"colors" validate:"dive,color"`
+	Engine       string          `json:"engine" validate:"required,oneof=native geq"`
+	Workers      int             `json:"workers" validate:"gte=0"`
+	Segments     int             `json:"segments" validate:"gte=0,lte=64"`
+	Preset       *string         `json:"preset"`
 }
 
 type Color string

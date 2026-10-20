@@ -36,6 +36,24 @@ func (c *VideoConfig) cyclePalette() {
 	c.Colors = cycled
 }
 
+// Size returns the width and height encoded in the resolution string (WxH).
+func (r VideoResolution) Size() (w, h int, err error) {
+	m := RegexPatterns.resolutionRegex.FindStringSubmatch(string(r))
+	if m == nil {
+		return 0, 0, fmt.Errorf("invalid resolution %q: want WxH", string(r))
+	}
+
+	if w, err = strconv.Atoi(m[1]); err != nil {
+		return 0, 0, err
+	}
+
+	if h, err = strconv.Atoi(m[2]); err != nil {
+		return 0, 0, err
+	}
+
+	return w, h, nil
+}
+
 // ParseHex splits a 6-digit hex color into 8-bit RGB channels.
 func (c Color) ParseHex() (r, g, b uint8, err error) {
 	if len(c) != 6 {
