@@ -16,30 +16,12 @@ func testConfig(res string) config.VideoConfig {
 }
 
 // referenceRGB evaluates the gradient directly, per pixel, with no tables.
-func referenceRGB(r *Radial, x, y, n int) (rgb [3]float64) {
+func referenceRGB(r *Radial, x, y, n int) [3]float64 {
 	l := r.layout
 	cx, cy := float64(l.W)/2, float64(l.H)/2
 	d := math.Hypot(float64(x)-cx, float64(y)-cy) / math.Hypot(cx, cy)
-	p := float64(n) / float64(r.frames)
 
-	for c := range 3 {
-		rgb[c] = float64(r.spec.Base[c])
-	}
-
-	for k, f := range r.spec.Fences {
-		t := clamp((d-f.At(p)+r.spec.Sigma)/(2*r.spec.Sigma), 0, 1)
-		s := t * t * (3 - 2*t)
-
-		for c := range 3 {
-			rgb[c] += float64(r.spec.Deltas[k][c]) * s
-		}
-	}
-
-	for c := range 3 {
-		rgb[c] = clamp(rgb[c], 0, 255)
-	}
-
-	return rgb
+	return r.spec.ColorAt(d, float64(n)/float64(r.frames))
 }
 
 func TestRadialMatchesReference(t *testing.T) {

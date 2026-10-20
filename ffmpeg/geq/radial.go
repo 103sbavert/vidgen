@@ -61,12 +61,12 @@ func buildSmoothstepTerm(boundarySlot, tempSlot, delta int, sigma float64) strin
 //	+ term_for_fence_2
 //	...
 //
-// baseVal:  the innermost color's value for this channel (e.g. 255 for R of FFF8EC)
-// deltas:   per-fence shift for this channel (e.g. [-35, -67, -69] for R)
-// N:        total number of rings/colors
-// sigma:    blur half-width
+// spec:     the gradient. Base[channel] is the innermost color's value (e.g.
+// 255 for R of FFF8EC); Deltas[k][channel] is the shift at fence k (e.g.
+// -35, -67, -69 for R).
+// channel:  0=R, 1=G, 2=B
 // duration: clip length in seconds
-func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duration int) string {
+func buildChannelExpr(spec gradient.Radial, channel, duration int) string {
 	var expr strings.Builder
 
 	// Store distance from center (normalized 0 -> 1)
@@ -84,23 +84,22 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 
 	// Store each fence position at current time
 	// Slot 2 = fence 1, slot 3 = fence 2, etc.
-	for k := 1; k < N; k++ {
-		intercept, slope := gradient.BoundaryConstants(k, N)
-		slot := k + 1
-		fmt.Fprintf(&expr, "st(%d,%f+%f*ld(1));", slot, intercept, slope)
+	for i, fence := range spec.Fences {
+		slot := i + 2
+		fmt.Fprintf(&expr, "st(%d,%f+%f*ld(1));", slot, fence.Intercept, fence.Slope)
 	}
 
 	// Start from innermost color's channel value
-	fmt.Fprintf(&expr, "%d", baseVal)
+	fmt.Fprintf(&expr, "%d", spec.Base[channel])
 
 	// Add each fence's contribution
-	// Fence k is in slot k+1, temp smoothstep value goes in slot N+1 (reused,
-	// always past the last fence slot N)
-	for k := 1; k < N; k++ {
-		boundarySlot := k + 1
-		tempSlot := N + 1
-		delta := int(deltas[k-1])
-		expr.WriteString(buildSmoothstepTerm(boundarySlot, tempSlot, delta, sigma))
+	// Fence i is in slot i+2, temp smoothstep value goes in the first slot
+	// past the last fence slot (reused by every term)
+	tempSlot := len(spec.Fences) + 2
+	for i := range spec.Fences {
+		boundarySlot := i + 2
+		delta := int(spec.Deltas[i][channel])
+		expr.WriteString(buildSmoothstepTerm(boundarySlot, tempSlot, delta, spec.Sigma))
 	}
 
 	return expr.String()
@@ -121,20 +120,9 @@ func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
 		return "", err
 	}
 
-	N := len(cfg.Colors)
-
-	// Extract per-channel deltas
-	var deltaR, deltaG, deltaB []int16
-	for _, d := range spec.Deltas {
-		deltaR = append(deltaR, d[0])
-		deltaG = append(deltaG, d[1])
-		deltaB = append(deltaB, d[2])
-	}
-
-	// Build each channel expression
-	rExpr := buildChannelExpr(int(spec.Base[0]), deltaR, N, spec.Sigma, cfg.Duration)
-	gExpr := buildChannelExpr(int(spec.Base[1]), deltaG, N, spec.Sigma, cfg.Duration)
-	bExpr := buildChannelExpr(int(spec.Base[2]), deltaB, N, spec.Sigma, cfg.Duration)
+	rExpr := buildChannelExpr(spec, 0, cfg.Duration)
+	gExpr := buildChannelExpr(spec, 1, cfg.Duration)
+	bExpr := buildChannelExpr(spec, 2, cfg.Duration)
 
 	return fmt.Sprintf("geq=r='%s':g='%s':b='%s'", rExpr, gExpr, bExpr), nil
 }

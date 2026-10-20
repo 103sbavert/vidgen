@@ -53,8 +53,7 @@ func (t *lut) build(g *gradient.Radial, p float64) {
 
 		for i := lo; i <= hi; i++ {
 			d := float64(i) / scale
-			s := clamp((d-pos+sigma)/(2*sigma), 0, 1)
-			s = s * s * (3 - 2*s)
+			s := gradient.Smoothstep(d, pos, sigma)
 
 			t.acc[0][i] += float64(delta[0]) * s
 			t.acc[1][i] += float64(delta[1]) * s

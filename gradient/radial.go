@@ -46,6 +46,38 @@ type Radial struct {
 	Sigma  float64
 }
 
+// Smoothstep returns the S-curve blend factor (0 inside the fence, 1
+// outside) for a pixel at normalized distance d from a fence at position pos
+// with transition half-width sigma.
+func Smoothstep(d, pos, sigma float64) float64 {
+	t := min(1, max(0, (d-pos+sigma)/(2*sigma)))
+
+	return t * t * (3 - 2*t)
+}
+
+// ColorAt evaluates the gradient directly: the RGB color (0..255, unrounded)
+// at normalized distance d and progress p. This is the canonical definition;
+// the geq expression and the native renderer's tables must agree with it.
+func (g Radial) ColorAt(d, p float64) (rgb [3]float64) {
+	for c := range rgb {
+		rgb[c] = float64(g.Base[c])
+	}
+
+	for k, fence := range g.Fences {
+		s := Smoothstep(d, fence.At(p), g.Sigma)
+
+		for c := range rgb {
+			rgb[c] += float64(g.Deltas[k][c]) * s
+		}
+	}
+
+	for c := range rgb {
+		rgb[c] = min(255, max(0, rgb[c]))
+	}
+
+	return rgb
+}
+
 // BoundaryConstants returns the intercept and slope that fully describe how
 // boundary k animates over time. Boundaries are numbered 1 through N-1,
 // from inside outward; boundary k sits between the k-th and (k+1)-th ring
