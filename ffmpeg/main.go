@@ -1,4 +1,11 @@
-// Package ffmpeg shells out to the ffmpeg binary to encode the final video.
+// Package ffmpeg turns a video config into an encoded file using the ffmpeg
+// binary.
+//
+// Two engines exist:
+//   - "native" (default): frames are rendered in Go on all cores (package
+//     render) and piped to ffmpeg as raw yuv420p, so ffmpeg only encodes.
+//   - "geq": a single ffmpeg geq filter expression generates the frames
+//     (package ffmpeg/geq). Much slower; kept as a reference implementation.
 package ffmpeg
 
 import (
@@ -11,9 +18,22 @@ import (
 	"sbavert/vidgen/ffmpeg/geq"
 )
 
-// Render builds the gradient filter expression for cfg and encodes output.
-// Dispatch is by gradient type; extend the switch alongside new geq builders.
+// Render encodes the video described by cfg to *cfg.Output using cfg.Engine.
 func Render(cfg config.VideoConfig) error {
+	switch cfg.Engine {
+	case "native", "":
+		return renderNative(cfg)
+	case "geq":
+		return renderGeq(cfg)
+	default:
+		return fmt.Errorf("unsupported engine %q", cfg.Engine)
+	}
+}
+
+// renderGeq builds the gradient filter expression for cfg and encodes output
+// with a single ffmpeg process. Dispatch is by gradient type; extend the
+// switch alongside new geq builders.
+func renderGeq(cfg config.VideoConfig) error {
 	var expr string
 
 	switch cfg.GradientType {
@@ -27,13 +47,13 @@ func Render(cfg config.VideoConfig) error {
 		return fmt.Errorf("unsupported gradient type %q", cfg.GradientType)
 	}
 
-	return run(buildArgs(cfg, expr))
+	return run(buildGeqArgs(cfg, expr))
 }
 
-// buildArgs assembles the ffmpeg argv for a gradient clip. The gradient itself
+// buildGeqArgs assembles the ffmpeg argv for a gradient clip. The gradient itself
 // comes from the geq filter expression; length lives in output -t only (the
 // nullsrc input is left endless). No shell is involved, so geq needs no quoting.
-func buildArgs(cfg config.VideoConfig, geq string) []string {
+func buildGeqArgs(cfg config.VideoConfig, geq string) []string {
 	fps := strconv.Itoa(cfg.Framerate)
 
 	return []string{
@@ -50,7 +70,7 @@ func buildArgs(cfg config.VideoConfig, geq string) []string {
 	}
 }
 
-// run executes argv (as built by BuildArgs) with output streamed to the console.
+// run executes argv with output streamed to the console.
 func run(argv []string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("no command to run")
