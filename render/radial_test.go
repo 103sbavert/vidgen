@@ -5,19 +5,40 @@ import (
 	"testing"
 
 	"sbavert/vidgen/config"
+	"sbavert/vidgen/gradient"
 )
 
-func testConfig(res string) config.VideoConfig {
-	cfg := config.GetDefaultConfig()
-	cfg.Resolution = config.VideoResolution(res)
-	cfg.Duration = 2
+const testFrames = 48
 
-	return cfg
+func testSpec(t testing.TB, colors ...config.Color) gradient.Radial {
+	t.Helper()
+
+	if len(colors) == 0 {
+		colors = config.GetDefaultConfig().Colors
+	}
+
+	spec, err := gradient.NewRadial(colors)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return spec
+}
+
+func newTestRadial(t testing.TB, w, h int) *Radial {
+	t.Helper()
+
+	r, err := NewRadial(testSpec(t), w, h, testFrames)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return r
 }
 
 // referenceRGB evaluates the gradient directly, per pixel, with no tables.
 func referenceRGB(r *Radial, x, y, n int) [3]float64 {
-	l := r.layout
+	l := r.Layout()
 	cx, cy := float64(l.W)/2, float64(l.H)/2
 	d := math.Hypot(float64(x)-cx, float64(y)-cy) / math.Hypot(cx, cy)
 
@@ -25,12 +46,8 @@ func referenceRGB(r *Radial, x, y, n int) [3]float64 {
 }
 
 func TestRadialMatchesReference(t *testing.T) {
-	for _, res := range []string{"320x180", "321x181"} {
-		r, err := NewRadial(testConfig(res))
-		if err != nil {
-			t.Fatal(err)
-		}
-
+	for _, size := range [][2]int{{320, 180}, {321, 181}} {
+		r := newTestRadial(t, size[0], size[1])
 		l := r.Layout()
 		buf := make([]byte, l.FrameSize())
 
@@ -66,18 +83,14 @@ func TestRadialMatchesReference(t *testing.T) {
 
 			// Rounding to 8 bit plus 12-bit distance quantization.
 			if worst > 1.0 {
-				t.Errorf("%s frame %d: max error %.3f levels, want <= 1", res, n, worst)
+				t.Errorf("%dx%d frame %d: max error %.3f levels, want <= 1", size[0], size[1], n, worst)
 			}
 		}
 	}
 }
 
 func TestRadialInnerOuterColors(t *testing.T) {
-	r, err := NewRadial(testConfig("640x360"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	r := newTestRadial(t, 640, 360)
 	l := r.Layout()
 	buf := make([]byte, l.FrameSize())
 	r.Render(0, buf)
@@ -92,12 +105,48 @@ func TestRadialInnerOuterColors(t *testing.T) {
 	}
 }
 
-func BenchmarkRadialRender1080p(b *testing.B) {
-	r, err := NewRadial(testConfig("1920x1080"))
-	if err != nil {
-		b.Fatal(err)
+func TestNewRadialRejectsBadSize(t *testing.T) {
+	spec := testSpec(t)
+
+	for _, tc := range []struct{ w, h, frames int }{{0, 10, 1}, {10, 0, 1}, {10, 10, 0}, {-1, 10, 5}} {
+		if _, err := NewRadial(spec, tc.w, tc.h, tc.frames); err == nil {
+			t.Errorf("NewRadial(%+v) accepted", tc)
+		}
+	}
+}
+
+// Field.Fill is independent of the gradient: a flat table must give flat
+// planes, and the chroma average must round-trip an exact value.
+func TestFieldFillFlatTable(t *testing.T) {
+	l := NewLayout(7, 5) // odd on purpose
+	f := newField(l, func(x, y int) float64 { return float64(x+y) / 20 })
+
+	var tbl Table
+	for i := range lutSize {
+		tbl.set(i, 200, 100, 50)
 	}
 
+	buf := make([]byte, l.FrameSize())
+	f.Fill(&tbl, buf)
+
+	yp, up, vp := l.Planes(buf)
+	wantY, wantU, wantV := yuv709(200, 100, 50)
+
+	for i, v := range yp {
+		if v != tbl.y[0] {
+			t.Fatalf("luma[%d] = %d, want %d (~%.1f)", i, v, tbl.y[0], wantY)
+		}
+	}
+
+	for i := range up {
+		if math.Abs(float64(up[i])-wantU) > 0.6 || math.Abs(float64(vp[i])-wantV) > 0.6 {
+			t.Fatalf("chroma[%d] = %d,%d want ~%.1f,%.1f", i, up[i], vp[i], wantU, wantV)
+		}
+	}
+}
+
+func BenchmarkRadialRender1080p(b *testing.B) {
+	r := newTestRadial(b, 1920, 1080)
 	buf := make([]byte, r.Layout().FrameSize())
 
 	b.SetBytes(int64(len(buf)))
@@ -109,11 +158,7 @@ func BenchmarkRadialRender1080p(b *testing.B) {
 }
 
 func BenchmarkRadialRender1080pParallel(b *testing.B) {
-	r, err := NewRadial(testConfig("1920x1080"))
-	if err != nil {
-		b.Fatal(err)
-	}
-
+	r := newTestRadial(b, 1920, 1080)
 	size := r.Layout().FrameSize()
 
 	b.SetBytes(int64(size))

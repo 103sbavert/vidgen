@@ -84,6 +84,20 @@ so an interrupted run (Ctrl-C) leaves no truncated file.
 `scripts/bench.sh [duration] [resolution] [codec...]` times each codec at 1, 2,
 4 and 8 segments.
 
+### Project layout
+
+| Package        | Role                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `config`       | Load, default, validate the JSON config; codec table; output path.                      |
+| `gradient`     | Engine-independent gradient math (`Radial.ColorAt` is the canonical definition).        |
+| `render`       | Native frame generation: distance `Field`, per-frame color `Table`, ordered `Stream`.   |
+| `ffmpeg`       | `Encode`: spawns ffmpeg, plans segments, atomic output. `ffmpeg/geq` is the slow engine. |
+| `progress`     | Terminal progress line fed by a per-frame callback.                                      |
+
+Adding a gradient type: add its math under `gradient`, a `render` source that
+reuses `Field.Fill` and `Stream`, and a case in `ffmpeg.newSource` (plus a geq
+builder if the reference engine should support it).
+
 ### Gradient types
 
 | Type       | Shape                    | Animation                            |

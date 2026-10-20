@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"sbavert/vidgen/config"
+	"sbavert/vidgen/gradient"
 	"sbavert/vidgen/render"
 )
 
@@ -13,7 +14,17 @@ import (
 func newSource(cfg config.VideoConfig) (render.Source, error) {
 	switch cfg.GradientType {
 	case config.GradientRadial:
-		return render.NewRadial(cfg)
+		spec, err := gradient.NewRadial(cfg.Colors)
+		if err != nil {
+			return nil, err
+		}
+
+		w, h, err := cfg.Resolution.Size()
+		if err != nil {
+			return nil, err
+		}
+
+		return render.NewRadial(spec, w, h, cfg.TotalFrames())
 	default:
 		return nil, fmt.Errorf("unsupported gradient type %q", cfg.GradientType)
 	}
