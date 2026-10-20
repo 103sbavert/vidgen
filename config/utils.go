@@ -57,10 +57,10 @@ func ReadConfigFile(p *string) (VideoConfig, error) {
 	return localConfig, nil
 }
 
-// NextAvailableFilename returns the first available file name, using c.Output
+// nextAvailableFilename returns the first available file name, using c.Output
 // if it is set or getAutomaticFilename() if unset. Appends a numbered suffix
 // if the name is not available.
-func NextAvailableFilename(c VideoConfig) string {
+func nextAvailableFilename(c VideoConfig) string {
 	base := getAutomaticFilename(c)
 
 	if !fileExists(base) {

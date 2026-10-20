@@ -28,7 +28,12 @@ func LoadConfig(p string) (cfg config.VideoConfig, err error) {
 
 	}
 
-	if err := cfg.Validate(); err != nil {
+	if err = cfg.Validate(); err != nil {
+		return cfg, err
+	}
+
+	err = cfg.CalcOutputPath()
+	if err != nil {
 		return cfg, err
 	}
 
@@ -57,26 +62,11 @@ func main() {
 				return err
 			}
 
-			var output string
-			if cfg.Output != nil {
-				output = *cfg.Output
-			} else {
-				output = config.NextAvailableFilename(cfg)
-			}
-
-			if _, err := os.Stat(output); err == nil {
-				return fmt.Errorf("output file already exists: %s", output)
-			} else if !os.IsNotExist(err) {
-				return err
-			}
-
-			cfg.Output = &output
-
 			if err := ffmpeg.Render(cfg); err != nil {
 				return err
 			}
 
-			fmt.Printf("wrote %s\n", output)
+			fmt.Printf("wrote %s\n", *cfg.Output)
 			return nil
 		},
 	}

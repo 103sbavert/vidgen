@@ -57,3 +57,18 @@ func (c Color) ParseHex() (r, g, b uint8, err error) {
 
 	return r, g, b, nil
 }
+
+func (c VideoConfig) CalcOutputPath() error {
+	if c.Output == nil {
+		p := nextAvailableFilename(c)
+		c.Output = &p
+	}
+
+	if _, err := os.Stat(*c.Output); err == nil {
+		return fmt.Errorf("output file already exists: %s", *c.Output)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
