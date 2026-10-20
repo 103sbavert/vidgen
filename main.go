@@ -3,13 +3,37 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"sbavert/vidgen/config"
-	"sbavert/vidgen/ffmpeg/geq"
+	"sbavert/vidgen/ffmpeg"
 
 	"github.com/spf13/cobra"
 )
+
+func LoadConfig(p string) (cfg config.VideoConfig, err error) {
+	if p == "" {
+		cfg = config.GetDefaultConfig()
+	} else {
+		p, err = filepath.Abs(p)
+		if err != nil {
+			return cfg, err
+		}
+
+		cfg, err = config.ReadConfigFile(&p)
+		if err != nil {
+			return cfg, err
+		}
+
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return cfg, err
+	}
+
+	return cfg, nil
+}
 
 func main() {
 	var configPath string
@@ -21,24 +45,38 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var cfg config.VideoConfig
-
-			if configPath == "" {
-				cfg = config.DefaultConfig
-			} else {
-				absConfPath, err := filepath.Abs(configPath)
-				if err != nil {
-					return err
-				}
-				cfg = config.LoadJSONFile(&absConfPath)
+			if _, err := exec.LookPath("ffmpeg"); err != nil {
+				return fmt.Errorf("ffmpeg not found on PATH: install ffmpeg to encode video")
 			}
 
-			expr, err := geq.BuildRadialGeq(cfg)
+			var cfg config.VideoConfig
+			var err error
+
+			cfg, err = LoadConfig(configPath)
 			if err != nil {
 				return err
 			}
 
-			fmt.Printf("%s", expr)
+			var output string
+			if cfg.Output != nil {
+				output = *cfg.Output
+			} else {
+				output = config.NextAvailableFilename(cfg)
+			}
+
+			if _, err := os.Stat(output); err == nil {
+				return fmt.Errorf("output file already exists: %s", output)
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+
+			cfg.Output = &output
+
+			if err := ffmpeg.Render(cfg); err != nil {
+				return err
+			}
+
+			fmt.Printf("wrote %s\n", output)
 			return nil
 		},
 	}
