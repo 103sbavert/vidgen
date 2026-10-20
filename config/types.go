@@ -28,11 +28,6 @@ type Color string
 
 type VideoResolution string
 
-type VideoCodec struct {
-	Name            string `validate:"required"`
-	FormatExtension string `validate:"required"`
-}
-
 type regexPatterns struct {
 	resolutionRegex *regexp.Regexp
 	colorRegex      *regexp.Regexp

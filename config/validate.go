@@ -28,8 +28,9 @@ func getValidator() *validator.Validate {
 
 		// Register custom validation for Color format
 		validate.RegisterValidation("color", func(fl validator.FieldLevel) bool {
-			val := fl.Field().Interface()
 			var colorStr string
+			val := fl.Field().Interface()
+
 			switch c := val.(type) {
 			case Color:
 				colorStr = string(c)
@@ -42,6 +43,7 @@ func getValidator() *validator.Validate {
 			if _, exists := colorKeywords[colorStr]; exists {
 				return true
 			}
+
 			return RegexPatterns.colorRegex.MatchString(colorStr)
 		})
 
