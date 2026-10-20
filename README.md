@@ -26,7 +26,7 @@ for a ready-to-copy template.
 
 | Key             | Type         | Default         | Description                                                                                                                            |
 | --------------- | ------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `output`        | string\|null | `null`          | Output path. If `null`, auto-named `{gradient_type}_{res}_{fps}fps_{bitrate}bps_{duration}s.{ext}`¹ where ext is inferred from codec.* |
+| `output`        | string\|null | `null`          | Output path. If `null`, auto-named `{gradient_type}_{res}_{fps}fps_{bitrate}bps_{duration}s.{ext}`¹ where ext is inferred from codec. Taken auto-names gain `_1`, `_2`, … until free.* |
 | `resolution`    | string       | `"1920x1080"`   | Frame size as `WxH`.                                                                                                                   |
 | `framerate`     | int          | `24`            | Frames per second.                                                                                                                     |
 | `bitrate`       | int          | `2097152`       | Video bitrate in bits per second.                                                                                                      |
