@@ -13,5 +13,9 @@
     "seed": null,
     "font_size": null,
     "font_color": "black",
+    "engine": "native",
+    "workers": 0,
+    "segments": 0,
+    "preset": null,
     "colors": ["546B41", "99AD7A", "DCCCAC", "FFF8EC"]
 }

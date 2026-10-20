@@ -54,8 +54,9 @@ func encodeArgs(cfg config.VideoConfig, l render.Layout, output string, frameCou
 }
 
 // encodeRange renders frames [start, end) of src, pipes them to a fresh
-// ffmpeg process and writes the encoded result to output.
-func encodeRange(ctx context.Context, cfg config.VideoConfig, src render.Source, start, end int, output string, threads int, onFrame func()) error {
+// ffmpeg process and writes the encoded result to output. threads limits the
+// encoder's threads and workers the render goroutines (<=0: defaults).
+func encodeRange(ctx context.Context, cfg config.VideoConfig, src render.Source, start, end int, output string, threads, workers int, onFrame func()) error {
 	args := encodeArgs(cfg, src.Layout(), output, end-start, threads)
 
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
@@ -71,7 +72,7 @@ func encodeRange(ctx context.Context, cfg config.VideoConfig, src render.Source,
 	}
 
 	streamErr := render.Stream(ctx, src, start, end, stdin, render.Options{
-		Workers:  cfg.Workers,
+		Workers:  workers,
 		Progress: onFrame,
 	})
 	stdin.Close()

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -33,7 +34,8 @@ func partialPath(output string) string {
 	return filepath.Join(dir, "."+stem+".partial"+ext)
 }
 
-// renderNative renders frames in Go and pipes them into ffmpeg for encoding.
+// renderNative renders frames in Go and pipes them into ffmpeg for encoding,
+// optionally as several parallel segments (see segmentCount).
 // The result is written to a temporary file and renamed on success, so a
 // failed or interrupted run never leaves a truncated output behind.
 func renderNative(cfg config.VideoConfig) error {
@@ -48,17 +50,58 @@ func renderNative(cfg config.VideoConfig) error {
 	output := *cfg.Output
 	tmp := partialPath(output)
 	total := src.Frames()
+	segments := segmentCount(cfg, total)
 
 	prog := newProgress(total)
 	stopProgress := prog.start()
 
-	err = encodeRange(ctx, cfg, src, 0, total, tmp, 0, prog.Tick)
+	if segments > 1 {
+		err = encodeSegments(ctx, cfg, src, segments, tmp, prog)
+	} else {
+		err = encodeRange(ctx, cfg, src, 0, total, tmp, 0, cfg.Workers, prog.Tick)
+	}
+
 	stopProgress()
 
 	if err != nil {
 		os.Remove(tmp)
+
+		if ctx.Err() != nil {
+			return fmt.Errorf("interrupted")
+		}
+
 		return err
 	}
 
 	return os.Rename(tmp, output)
+}
+
+// minSegmentFrames keeps auto-chosen segments long enough that the extra
+// keyframe and rate-control restart per segment stay negligible.
+const minSegmentFrames = 24
+
+// segmentCount resolves cfg.Segments to the number of parallel segments to
+// use for a clip of total frames: 1 means a single ffmpeg process.
+func segmentCount(cfg config.VideoConfig, total int) int {
+	if cfg.Segments > 0 {
+		return max(1, min(cfg.Segments, total))
+	}
+
+	return max(1, min(autoSegments(cfg), total/minSegmentFrames))
+}
+
+// autoSegments picks a segment count when the user left it at 0.
+//
+// Measured on 1080p: libx264, libsvtav1, mpeg4 and hardware encoders already
+// saturate the machine from one process, so segmenting only costs bitrate
+// fidelity. libvpx (VP8/VP9) and libaom scale poorly across threads and gain
+// 3-5x from running independent segments side by side. libx265 gains ~25% but
+// shifts rate control noticeably, so it stays opt-in (segments: 2).
+func autoSegments(cfg config.VideoConfig) int {
+	switch cfg.Codec {
+	case "libvpx", "libvpx-vp9", "libaom-av1":
+		return min(8, max(1, runtime.NumCPU()/4))
+	default:
+		return 1
+	}
 }

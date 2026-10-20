@@ -41,6 +41,10 @@ for a ready-to-copy template.
 | `nb_colors`     | int          | `4`             | How many colors to use from `colors`. Cycles if fewer than requested.                                                                                                                  |
 | `speed`         | float        | `0.08`          | Animation speed in color-cycles per second.                                                                                                                                            |
 | `seed`          | —            | `null`          | Reserved, currently unused.                                                                                                                                                            |
+| `engine`        | string       | `"native"`      | `native`: frames rendered in Go, piped to ffmpeg for encoding (fast). `geq`: single ffmpeg `geq` filter (slow reference path).                                                         |
+| `workers`       | int          | `0`             | Render goroutines for the native engine. `0` = number of CPUs.                                                                                                                         |
+| `segments`      | int          | `0`             | Parallel encode segments for the native engine. `0` = auto, `1` = off. See [Performance](#performance).                                                                                |
+| `preset`        | string\|null | `null`          | Passed to ffmpeg as `-preset` when set (e.g. `veryfast` for libx264/libx265).                                                                                                          |
 
 ¹ Environment variables and shell metacharacters characters are expanded if a
 value is specified. If the value points to a directory that exists on the
@@ -50,6 +54,32 @@ path.
 ² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
 
 ![palette](palette.png)
+
+### Performance
+
+The default `native` engine renders frames in Go and streams raw `yuv420p`
+(BT.709, limited range, tagged as such) into ffmpeg, which only encodes. A
+gradient depends only on distance-from-center and time, so a distance map is
+computed once and each frame needs just a small color lookup table plus a
+table lookup per pixel, spread over all cores. A 30 s 1080p24 clip went from
+about 3.5 min with `geq` to about 3 s (libx264, 16 cores); encoding is now the
+bottleneck.
+
+`segments` additionally splits the clip into independent parts, each with its
+own render pipeline and ffmpeg process, then joins them with a lossless
+stream-copy concat. This helps encoders that scale poorly across threads and
+is chosen automatically for `libvpx`, `libvpx-vp9` and `libaom-av1`
+(3-5x faster). It does nothing for `libx264`, `libsvtav1` or `mpeg4`, which
+already saturate the CPU, and gives ~25% for `libx265` (opt in with
+`"segments": 2`). Every segment starts with a keyframe and restarts rate
+control, so the achieved bitrate and file size differ somewhat from a single
+pass.
+
+Output is written to a hidden `.name.partial.ext` file and renamed on success,
+so an interrupted run (Ctrl-C) leaves no truncated file.
+
+`scripts/bench.sh [duration] [resolution] [codec...]` times each codec at 1, 2,
+4 and 8 segments.
 
 ### Gradient types
 
