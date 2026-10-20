@@ -35,8 +35,8 @@ for a ready-to-copy template.
 | `text`          | string\|null | `null`          | Static text overlay. If `null`, shows video metadata (resolution, fps, format, codec, duration).                                                                                       |
 | `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled to `height / 12` (e.g. 60px at 720p).                                                                                                      |
 | `font_color`    | string       | `"black"`       | Text color — HTML name or `#RRGGBB`.                                                                                                                                                   |
-| `gradient_type` | string       | `"radial"`      | One of: `linear`, `radial`, `circular`, `spiral`, `square`. Only `radial` is implemented so far.                                                                                       |
-| `linear_angle`  | int          | `0`             | Rotation of the `linear` gradient in degrees (0 = horizontal, 90 = vertical). Has no effect on other gradient types.                                                                   |
+| `gradient_type` | string       | `"radial"`      | One of: `linear`, `radial`, `circular`, `spiral`, `square`. `linear` and `radial` are implemented so far.                                                                              |
+| `linear_angle`  | int          | `0`             | Direction of the `linear` gradient in degrees, 0–360 (0 = left→right, 90 = top→bottom, 180 = right→left, 270 = bottom→top). Has no effect on other gradient types.                    |
 | `colors`        | string[]     | pastel palette² | List of hex color strings (without `#`).                                                                                                                                               |
 | `nb_colors`     | int          | `4`             | How many colors to use from `colors`. Cycles if fewer than requested.                                                                                                                  |
 | `speed`         | float        | `0.08`          | Animation speed in color-cycles per second.                                                                                                                                            |
@@ -53,8 +53,8 @@ variables, output directories) is not implemented yet.
 ² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
 
 > [!NOTE]
-> `text`, `font_size`, `font_color`, `linear_angle`, `speed` and `seed` are
-> accepted and validated but not used by any engine yet.
+> `text`, `font_size`, `font_color`, `speed` and `seed` are accepted and
+> validated but not used by any engine yet.
 
 ![palette](palette.png)
 
@@ -62,7 +62,8 @@ variables, output directories) is not implemented yet.
 
 The default `native` engine renders frames in Go and streams raw `yuv420p`
 (BT.709, limited range, tagged as such) into ffmpeg, which only encodes. A
-gradient depends only on distance-from-center and time, so a distance map is
+gradient's color depends only on a per-pixel position (distance from the
+center, or distance along a direction) and time, so the position map is
 computed once and each frame needs just a small color lookup table plus a
 table lookup per pixel, spread over all cores. A 30 s 1080p24 clip went from
 about 3.5 min with `geq` to about 3 s (libx264, 16 cores); encoding is now the
@@ -89,24 +90,29 @@ so an interrupted run (Ctrl-C) leaves no truncated file.
 | Package        | Role                                                                                     |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | `config`       | Load, default, validate the JSON config; codec table; output path.                      |
-| `gradient`     | Engine-independent gradient math (`Radial.ColorAt` is the canonical definition).        |
-| `render`       | Native frame generation: distance `Field`, per-frame color `Table`, ordered `Stream`.   |
+| `gradient`     | Engine-independent gradient math: `Shape` (radial, linear) + `Bands` colors (`Bands.ColorAt` is the canonical definition). |
+| `render`       | Native frame generation: position `Field`, per-frame color `Table`, ordered `Stream`.   |
 | `ffmpeg`       | `Encode`: spawns ffmpeg, plans segments, atomic output. `ffmpeg/geq` is the slow engine. |
 | `progress`     | Terminal progress line fed by a per-frame callback.                                      |
 
-Adding a gradient type: add its math under `gradient`, a `render` source that
-reuses `Field.Fill` and `Stream`, and a case in `ffmpeg.newSource` (plus a geq
-builder if the reference engine should support it).
+Adding a gradient type: add a `Shape` and a case in `gradient.New`, plus a
+matching expression in `ffmpeg/geq`'s `shapeExpr`. The native renderer
+(`render.Banded`), the pipeline and the encoder need no changes; a test in
+`ffmpeg` compares both engines frame by frame.
 
 ### Gradient types
 
-| Type       | Shape                    | Animation                            |
-| ---------- | ------------------------ | ------------------------------------ |
-| `linear`   | Parallel color bands     | Bands slide along the gradient slope |
-| `radial`   | Soft rings from center   | Rings expand outward                 |
-| `circular` | Tighter concentric rings | Rings expand outward (3× frequency)  |
-| `spiral`   | Archimedean spiral       | Spiral rotates around center         |
-| `square`   | Concentric rectangles    | Rectangles expand outward            |
+Implemented gradients share one animation: the bands start at unequal widths
+(the first color widest) and drift toward equal widths over the clip, with soft
+S-curve edges.
+
+| Type       | Shape                    | Animation                            | Status      |
+| ---------- | ------------------------ | ------------------------------------ | ----------- |
+| `linear`   | Parallel stripes, first color at the start edge (see `linear_angle`) | Stripes drift toward equal width | implemented |
+| `radial`   | Soft rings from center, first color outermost | Rings drift toward equal width | implemented |
+| `circular` | Tighter concentric rings (3× frequency) | planned | not yet |
+| `spiral`   | Archimedean spiral | planned | not yet |
+| `square`   | Concentric rectangles | planned | not yet |
 
 ### Codec → container mapping
 

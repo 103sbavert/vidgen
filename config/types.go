@@ -16,7 +16,7 @@ type VideoConfig struct {
 	Text         *string         `json:"text"`
 	NbColors     int             `json:"nb_colors" validate:"gt=0,lte=16"`
 	Speed        float64         `json:"speed" validate:"gt=0"`
-	GradientType string          `json:"gradient_type" validate:"required,oneof=radial"`
+	GradientType string          `json:"gradient_type" validate:"required,oneof=radial linear"`
 	LinearAngle  int             `json:"linear_angle" validate:"min=0,max=360"`
 	Seed         *int            `json:"seed"`
 	FontSize     *int            `json:"font_size" validate:"omitempty,gt=0"`

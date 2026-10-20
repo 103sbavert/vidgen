@@ -51,7 +51,7 @@ func buildSmoothstepTerm(boundarySlot, tempSlot, delta int, sigma float64) strin
 //
 // Structure of the output:
 //
-//	st(0, distance from center);       ← store d
+//	st(0, shape position);             ← store s (see shapeExpr)
 //	st(1, T/duration);                 ← store progress p
 //	st(2, intercept_1 + slope_1*ld(1)); ← store fence 1 position
 //	st(3, intercept_2 + slope_2*ld(1)); ← store fence 2 position
@@ -61,16 +61,17 @@ func buildSmoothstepTerm(boundarySlot, tempSlot, delta int, sigma float64) strin
 //	+ term_for_fence_2
 //	...
 //
-// spec:     the gradient. Base[channel] is the innermost color's value (e.g.
+// shape:    geq expression for the position s (0..1) of the current pixel
+// spec:     the color bands. Base[channel] is the innermost color's value (e.g.
 // 255 for R of FFF8EC); Deltas[k][channel] is the shift at fence k (e.g.
 // -35, -67, -69 for R).
 // channel:  0=R, 1=G, 2=B
 // duration: clip length in seconds
-func buildChannelExpr(spec gradient.Radial, channel, duration int) string {
+func buildChannelExpr(shape string, spec gradient.Bands, channel, duration int) string {
 	var expr strings.Builder
 
-	// Store distance from center (normalized 0 -> 1)
-	expr.WriteString("st(0,hypot(X-W/2,Y-H/2)/hypot(W/2,H/2));")
+	// Store the pixel's position (normalized 0 -> 1)
+	fmt.Fprintf(&expr, "st(0,%s);", shape)
 
 	// Store progress through clip (0 -> 1)
 	fmt.Fprintf(&expr, "st(1,T/%d.0);", duration)
@@ -79,7 +80,7 @@ func buildChannelExpr(spec gradient.Radial, channel, duration int) string {
 	// contribution = delta * s
 	//
 	// st(tempSlot, t) stores t AND returns it, so we can reuse it in the smoothstep formula
-	// ld(0) = d (distance from center)
+	// ld(0) = s (position of the pixel)
 	// ld(boundarySlot) = fence position at current time
 
 	// Store each fence position at current time
@@ -105,24 +106,51 @@ func buildChannelExpr(spec gradient.Radial, channel, duration int) string {
 	return expr.String()
 }
 
-// BuildRadialGeq is the entry point. Reads colors and duration from config,
-// runs all the math, and returns the complete geq filter string for ffmpeg's -vf flag.
+// shapeExpr returns the geq expression that evaluates the gradient shape at
+// the current pixel, mirroring gradient.RadialShape / gradient.LinearShape.
+// X, Y, W, H are geq's built-in pixel coordinates and frame size.
+func shapeExpr(cfg config.VideoConfig) (string, error) {
+	switch cfg.GradientType {
+	case config.GradientRadial:
+		return "hypot(X-W/2,Y-H/2)/hypot(W/2,H/2)", nil
+	case config.GradientLinear:
+		// Parenthesized constants: they may be negative or -0.
+		ux, uy := gradient.Direction(cfg.LinearAngle)
+
+		return fmt.Sprintf(
+			"1-(0.5+((X-W/2)*(%f)+(Y-H/2)*(%f))/(abs(W*(%f))+abs(H*(%f))))",
+			ux, uy, ux, uy,
+		), nil
+	default:
+		return "", fmt.Errorf("unsupported gradient type %q", cfg.GradientType)
+	}
+}
+
+// Build is the entry point. Reads gradient type, colors, angle and duration
+// from config, runs all the math, and returns the complete geq filter string
+// for ffmpeg's -vf flag.
 //
-// Builds a gradient.Radial spec from the palette, then buildChannelExpr
+// Builds a gradient.Bands spec from the palette, then buildChannelExpr
 // three times (once per channel), and joins them as:
 //
-//	"geq=r='...':g='...':b='..."
+//	"geq=r='...':g='...':b='...'"
 //
-// Returns an error if any color string is malformed or Colors slice is empty.
-func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
-	spec, err := gradient.NewRadial(cfg.Colors)
+// Returns an error if the gradient type is unsupported, any color string is
+// malformed or the Colors slice is too short.
+func Build(cfg config.VideoConfig) (string, error) {
+	spec, err := gradient.NewBands(cfg.Colors)
 	if err != nil {
 		return "", err
 	}
 
-	rExpr := buildChannelExpr(spec, 0, cfg.Duration)
-	gExpr := buildChannelExpr(spec, 1, cfg.Duration)
-	bExpr := buildChannelExpr(spec, 2, cfg.Duration)
+	shape, err := shapeExpr(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	rExpr := buildChannelExpr(shape, spec, 0, cfg.Duration)
+	gExpr := buildChannelExpr(shape, spec, 1, cfg.Duration)
+	bExpr := buildChannelExpr(shape, spec, 2, cfg.Duration)
 
 	return fmt.Sprintf("geq=r='%s':g='%s':b='%s'", rExpr, gExpr, bExpr), nil
 }

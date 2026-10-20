@@ -24,6 +24,7 @@ const (
 // with the `oneof` validation tag on that field.
 const (
 	GradientRadial = "radial"
+	GradientLinear = "linear"
 )
 
 var colorKeywords = map[string]string{

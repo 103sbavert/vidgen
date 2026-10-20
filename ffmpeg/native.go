@@ -2,7 +2,6 @@ package ffmpeg
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 
 	"sbavert/vidgen/config"
@@ -10,24 +9,19 @@ import (
 	"sbavert/vidgen/render"
 )
 
-// newSource picks the native frame generator for the configured gradient.
+// newSource builds the native frame generator for the configured gradient.
 func newSource(cfg config.VideoConfig) (render.Source, error) {
-	switch cfg.GradientType {
-	case config.GradientRadial:
-		spec, err := gradient.NewRadial(cfg.Colors)
-		if err != nil {
-			return nil, err
-		}
-
-		w, h, err := cfg.Resolution.Size()
-		if err != nil {
-			return nil, err
-		}
-
-		return render.NewRadial(spec, w, h, cfg.TotalFrames())
-	default:
-		return nil, fmt.Errorf("unsupported gradient type %q", cfg.GradientType)
+	g, err := gradient.New(cfg)
+	if err != nil {
+		return nil, err
 	}
+
+	w, h, err := cfg.Resolution.Size()
+	if err != nil {
+		return nil, err
+	}
+
+	return render.NewBanded(g, w, h, cfg.TotalFrames())
 }
 
 // encodeNative renders frames in Go and pipes them into ffmpeg, as one

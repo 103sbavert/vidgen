@@ -8,9 +8,9 @@ import (
 	"sbavert/vidgen/gradient"
 )
 
-// radialTable is a Table plus the scratch space its builder needs, pooled
+// bandTable is a Table plus the scratch space its builder needs, pooled
 // together so frames do not allocate.
-type radialTable struct {
+type bandTable struct {
 	Table
 
 	acc  [3][lutSize]float64
@@ -22,7 +22,7 @@ type radialTable struct {
 // For each fence only the smoothstep transition band touches individual
 // entries (acc); everything beyond the band gets the full delta, applied via
 // a running sum over step. Total cost is O(lutSize + fences*bandWidth).
-func (t *radialTable) build(g *gradient.Radial, p float64) {
+func (t *bandTable) build(g *gradient.Bands, p float64) {
 	t.acc = [3][lutSize]float64{}
 	t.step = [3][lutSize + 1]float64{}
 
@@ -68,19 +68,19 @@ func (t *radialTable) build(g *gradient.Radial, p float64) {
 	}
 }
 
-// Radial renders the animated radial gradient described by a gradient.Radial.
-// It is safe for concurrent use: the distance field is immutable and the
-// per-frame tables come from a pool.
-type Radial struct {
+// Banded renders any gradient.Gradient: banded colors laid out by a shape
+// (radial, linear, ...). It is safe for concurrent use: the position field is
+// immutable and the per-frame tables come from a pool.
+type Banded struct {
 	field  *Field
-	spec   gradient.Radial
+	bands  gradient.Bands
 	frames int
 	pool   sync.Pool
 }
 
-// NewRadial prepares a renderer for a w x h clip of frames frames, computing
-// the distance field up front.
-func NewRadial(spec gradient.Radial, w, h, frames int) (*Radial, error) {
+// NewBanded prepares a renderer for a w x h clip of frames frames, evaluating
+// g.Shape for every pixel up front. g.Shape must have been built for w x h.
+func NewBanded(g gradient.Gradient, w, h, frames int) (*Banded, error) {
 	if w <= 0 || h <= 0 {
 		return nil, fmt.Errorf("invalid frame size %dx%d", w, h)
 	}
@@ -89,34 +89,31 @@ func NewRadial(spec gradient.Radial, w, h, frames int) (*Radial, error) {
 		return nil, fmt.Errorf("invalid frame count %d", frames)
 	}
 
-	// Same definition as the geq expression: integer pixel coordinates,
-	// distance to (W/2, H/2) normalized by the half-diagonal.
-	cx, cy := float64(w)/2, float64(h)/2
-	norm := 1 / math.Hypot(cx, cy)
-
-	r := &Radial{
-		spec:   spec,
-		frames: frames,
-		field: newField(NewLayout(w, h), func(x, y int) float64 {
-			return math.Hypot(float64(x)-cx, float64(y)-cy) * norm
-		}),
+	if g.Shape == nil {
+		return nil, fmt.Errorf("gradient has no shape")
 	}
-	r.pool.New = func() any { return new(radialTable) }
+
+	r := &Banded{
+		bands:  g.Bands,
+		frames: frames,
+		field:  newField(NewLayout(w, h), g.Shape),
+	}
+	r.pool.New = func() any { return new(bandTable) }
 
 	return r, nil
 }
 
 // Layout returns the frame layout produced by Render.
-func (r *Radial) Layout() Layout { return r.field.layout }
+func (r *Banded) Layout() Layout { return r.field.layout }
 
 // Frames is the total number of frames in the clip.
-func (r *Radial) Frames() int { return r.frames }
+func (r *Banded) Frames() int { return r.frames }
 
 // Render fills buf (len >= Layout().FrameSize()) with frame n.
-func (r *Radial) Render(n int, buf []byte) {
-	t := r.pool.Get().(*radialTable)
+func (r *Banded) Render(n int, buf []byte) {
+	t := r.pool.Get().(*bandTable)
 	defer r.pool.Put(t)
 
-	t.build(&r.spec, float64(n)/float64(r.frames))
+	t.build(&r.bands, float64(n)/float64(r.frames))
 	r.field.Fill(&t.Table, buf)
 }

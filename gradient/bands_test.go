@@ -40,21 +40,21 @@ func TestColorDeltas(t *testing.T) {
 	}
 }
 
-func TestNewRadialErrors(t *testing.T) {
+func TestNewBandsErrors(t *testing.T) {
 	for name, colors := range map[string][]config.Color{
 		"none":      nil,
 		"one":       {"112233"},
 		"bad inner": {"112233", "xyz"},
 		"bad outer": {"nothex", "112233"},
 	} {
-		if _, err := NewRadial(colors); err == nil {
+		if _, err := NewBands(colors); err == nil {
 			t.Errorf("%s: want error", name)
 		}
 	}
 }
 
 func TestColorAtEndpoints(t *testing.T) {
-	g, err := NewRadial(defaultColors)
+	g, err := NewBands(defaultColors)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestColorAtEndpoints(t *testing.T) {
 
 func TestColorAtClamped(t *testing.T) {
 	// Deltas that overshoot must clamp to 0..255.
-	g, err := NewRadial([]config.Color{"ffffff", "000000"})
+	g, err := NewBands([]config.Color{"ffffff", "000000"})
 	if err != nil {
 		t.Fatal(err)
 	}

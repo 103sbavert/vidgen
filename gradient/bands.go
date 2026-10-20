@@ -1,12 +1,19 @@
-// Package gradient holds the engine-independent math of the animated radial
-// gradient: ring geometry, fence motion and color deltas. Both the native
-// renderer (package render) and the geq expression builder (package
-// ffmpeg/geq) are driven from the same Radial spec, so they stay in sync.
+// Package gradient holds the engine-independent math of the animated
+// banded gradients: band geometry, fence motion and color deltas. Both the
+// native renderer (package render) and the geq expression builder (package
+// ffmpeg/geq) are driven from the same Bands spec and Shape, so they stay in
+// sync.
+//
+// A gradient is two independent parts:
+//   - Shape: maps a pixel to a scalar position (s) in 0→1. Radial shape: distance
+//     from the center. Linear shape: distance along a direction.
+//   - Bands: maps (s, progress) to a color. Rings/stripes start at unequal
+//     widths and animate toward equal width over the clip.
 //
 // Key concepts:
-//   - Distance (d): normalized 0→1 from center to corner
+//   - Position (s): normalized 0→1 from the innermost color to the outermost
 //   - Progress (p): normalized 0→1 from clip start to end
-//   - Fences: dividing lines between rings, moving linearly with p
+//   - Fences: dividing lines between bands, moving linearly with p
 //   - Smoothstep: S-curve blending of colors across a fence
 //   - Color deltas: RGB shift applied when crossing each fence
 package gradient
@@ -20,7 +27,7 @@ import (
 // Sigma is the half-width of the fuzzy transition zone around each fence.
 const Sigma = 0.05
 
-// Fence describes how one ring boundary moves: position = Intercept + Slope*p.
+// Fence describes how one band boundary moves: position = Intercept + Slope*p.
 type Fence struct {
 	Intercept float64
 	Slope     float64
@@ -31,15 +38,16 @@ func (f Fence) At(p float64) float64 {
 	return f.Intercept + f.Slope*p
 }
 
-// Radial is the complete description of an animated radial gradient.
+// Bands is the complete color description of an animated banded gradient.
 //
-// Colors in config are ordered outermost-first. Fences and Deltas are ordered
-// innermost-first: Fences[i] sits between ring i and ring i+1 counted from the
-// center, and Deltas[i] is the RGB shift applied when crossing it outward.
-// The color at distance d and progress p is
+// Colors in config are ordered outermost-first (s=1 is the first color, s=0
+// the last). Fences and Deltas are ordered innermost-first: Fences[i] sits
+// between band i and band i+1 counted from s=0, and Deltas[i] is the RGB
+// shift applied when crossing it toward larger s. The color at position s and
+// progress p is
 //
-//	Base + sum_i Deltas[i] * smoothstep((d - Fences[i].At(p) + Sigma) / (2*Sigma))
-type Radial struct {
+//	Base + sum_i Deltas[i] * smoothstep((s - Fences[i].At(p) + Sigma) / (2*Sigma))
+type Bands struct {
 	Base   [3]uint8
 	Deltas [][3]int16
 	Fences []Fence
@@ -47,8 +55,8 @@ type Radial struct {
 }
 
 // Smoothstep returns the S-curve blend factor (0 inside the fence, 1
-// outside) for a pixel at normalized distance d from a fence at position pos
-// with transition half-width sigma.
+// outside) for a pixel at normalized position d against a fence at position
+// pos with transition half-width sigma.
 func Smoothstep(d, pos, sigma float64) float64 {
 	t := min(1, max(0, (d-pos+sigma)/(2*sigma)))
 
@@ -56,9 +64,9 @@ func Smoothstep(d, pos, sigma float64) float64 {
 }
 
 // ColorAt evaluates the gradient directly: the RGB color (0..255, unrounded)
-// at normalized distance d and progress p. This is the canonical definition;
+// at normalized position d and progress p. This is the canonical definition;
 // the geq expression and the native renderer's tables must agree with it.
-func (g Radial) ColorAt(d, p float64) (rgb [3]float64) {
+func (g Bands) ColorAt(d, p float64) (rgb [3]float64) {
 	for c := range rgb {
 		rgb[c] = float64(g.Base[c])
 	}
@@ -135,11 +143,11 @@ func ColorDeltas(colors []config.Color) (deltas [][3]int16, errorList []error) {
 		outerR, outerG, outerB, errOuter := outerColor.ParseHex()
 
 		if errInner != nil {
-			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", innerColor, i+1, errInner))
+			errorList = append(errorList, fmt.Errorf("could not parse band color %s at position %d: %w", innerColor, i+1, errInner))
 		}
 
 		if errOuter != nil {
-			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", outerColor, i, errOuter))
+			errorList = append(errorList, fmt.Errorf("could not parse band color %s at position %d: %w", outerColor, i, errOuter))
 		}
 
 		if errInner != nil || errOuter != nil {
@@ -156,32 +164,32 @@ func ColorDeltas(colors []config.Color) (deltas [][3]int16, errorList []error) {
 	return
 }
 
-// NewRadial builds the gradient description for colors (outermost-first).
+// NewBands builds the color description for colors (outermost-first).
 // Returns an error if there are fewer than 2 colors or any color is malformed.
-func NewRadial(colors []config.Color) (Radial, error) {
+func NewBands(colors []config.Color) (Bands, error) {
 	N := len(colors)
 
 	if N == 0 {
-		return Radial{}, fmt.Errorf("no colors provided")
+		return Bands{}, fmt.Errorf("no colors provided")
 	}
 
 	if N == 1 {
-		return Radial{}, fmt.Errorf("need at least 2 colors for a gradient")
+		return Bands{}, fmt.Errorf("need at least 2 colors for a gradient")
 	}
 
 	innermost := colors[N-1]
 	r, g, b, err := innermost.ParseHex()
 	if err != nil {
-		return Radial{}, fmt.Errorf("invalid innermost color %s: %w", innermost, err)
+		return Bands{}, fmt.Errorf("invalid innermost color %s: %w", innermost, err)
 	}
 
 	deltas, errs := ColorDeltas(colors)
 	if len(errs) > 0 {
-		return Radial{}, fmt.Errorf("color parsing errors: %v", errs)
+		return Bands{}, fmt.Errorf("color parsing errors: %v", errs)
 	}
 
 	if len(deltas) != N-1 {
-		return Radial{}, fmt.Errorf("expected %d deltas, got %d", N-1, len(deltas))
+		return Bands{}, fmt.Errorf("expected %d deltas, got %d", N-1, len(deltas))
 	}
 
 	fences := make([]Fence, 0, N-1)
@@ -190,7 +198,7 @@ func NewRadial(colors []config.Color) (Radial, error) {
 		fences = append(fences, Fence{Intercept: intercept, Slope: slope})
 	}
 
-	return Radial{
+	return Bands{
 		Base:   [3]uint8{r, g, b},
 		Deltas: deltas,
 		Fences: fences,
