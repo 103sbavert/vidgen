@@ -32,9 +32,9 @@ for a ready-to-copy template.
 | `bitrate`       | int          | `2097152`       | Video bitrate in bits per second.                                                                                                                                                      |
 | `codec`         | string       | `"libx264"`     | FFmpeg video codec. See codec table below.                                                                                                                                             |
 | `duration`      | int          | `30`            | Length in seconds.                                                                                                                                                                     |
-| `text`          | string\|null | `null`          | Static text overlay. If `null`, shows video metadata (resolution, fps, format, codec, duration).                                                                                       |
-| `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled to `height / 12` (e.g. 60px at 720p).                                                                                                      |
-| `font_color`    | string       | `"black"`       | Text color — HTML name or `#RRGGBB`.                                                                                                                                                   |
+| `text`          | string\|null | `null`          | Static text overlay, centered; `\n` starts a new line. If `null`, shows video metadata (resolution, fps, format, codec, duration). An empty string `""` draws no text.³                 |
+| `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled: `height / 12` (min 24) for custom text, `height / 28` (min 14) for the metadata block.                                                     |
+| `font_color`    | string       | `"black"`       | Text color: `RRGGBB` hex (optional `#`) or one of `black`, `white`, `red`, `green`, `blue` (soft shades, not pure).                                                                    |
 | `gradient_type` | string       | `"radial"`      | One of: `linear`, `radial`, `circular`, `spiral`, `square`. `linear` and `radial` are implemented so far.                                                                              |
 | `linear_angle`  | int          | `0`             | Direction of the `linear` gradient in degrees, 0–360 (0 = left→right, 90 = top→bottom, 180 = right→left, 270 = bottom→top). Has no effect on other gradient types.                    |
 | `colors`        | string[]     | pastel palette² | List of hex color strings (without `#`).                                                                                                                                               |
@@ -53,8 +53,12 @@ variables, output directories) is not implemented yet.
 ² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
 
 > [!NOTE]
-> `text`, `font_size`, `font_color`, `speed` and `seed` are accepted and
-> validated but not used by any engine yet.
+³ Text is rendered with the bundled Noto Sans Regular, anti-aliased, and drawn
+identically by both engines (see [Text overlay](#text-overlay)).
+
+> [!NOTE]
+> `speed` and `seed` are accepted and validated but not used by any engine
+> yet.
 
 ![palette](palette.png)
 
@@ -85,13 +89,34 @@ so an interrupted run (Ctrl-C) leaves no truncated file.
 `scripts/bench.sh [duration] [resolution] [codec...]` times each codec at 1, 2,
 4 and 8 segments.
 
+### Text overlay
+
+Text is laid out and rasterized once (`caption` package, bundled Noto Sans via
+`fonts`) into an anti-aliased coverage mask. The native engine blends that mask
+straight into each `yuv420p` frame, which touches only the pixels the text
+covers and costs well under 1 ms per frame. The `geq` engine writes the same
+mask as a transparent PNG and lets ffmpeg's `overlay` filter composite it, so
+both engines draw the same glyphs in the same place.
+
+With `text: null` the overlay is a five-line metadata block:
+
+```
+1920 x 1080 px
+24 fps
+MP4
+libx264
+30s
+```
+
 ### Project layout
 
 | Package        | Role                                                                                     |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | `config`       | Load, default, validate the JSON config; codec table; output path.                      |
 | `gradient`     | Engine-independent gradient math: `Shape` (radial, linear) + `Bands` colors (`Bands.ColorAt` is the canonical definition). |
-| `render`       | Native frame generation: position `Field`, per-frame color `Table`, ordered `Stream`.   |
+| `render`       | Native frame generation: position `Field`, per-frame color `Table`, text `Overlay`, ordered `Stream`. |
+| `caption`      | Text layout and rasterization into a coverage mask.                                      |
+| `fonts`        | The embedded typeface.                                                                   |
 | `ffmpeg`       | `Encode`: spawns ffmpeg, plans segments, atomic output. `ffmpeg/geq` is the slow engine. |
 | `progress`     | Terminal progress line fed by a per-frame callback.                                      |
 

@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/image v0.47.0
 )
 
 require (

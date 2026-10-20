@@ -59,16 +59,23 @@ func (r VideoResolution) Size() (w, h int, err error) {
 	return w, h, nil
 }
 
-// ParseHex splits a 6-digit hex color into 8-bit RGB channels.
+// ParseHex splits a color into 8-bit RGB channels. The color is either 6 hex
+// digits or one of the named keywords (black, white, red, green, blue), which
+// the JSON loader normally resolves already but defaults leave as-is.
 func (c Color) ParseHex() (r, g, b uint8, err error) {
-	if len(c) != 6 {
+	hex := string(c)
+	if keyword, ok := colorKeywords[hex]; ok {
+		hex = keyword
+	}
+
+	if len(hex) != 6 {
 		err = fmt.Errorf("invalid hex color %q: must be 6 hex digits", string(c))
 		return
 	}
 
-	rHex := string(c[0:2])
-	gHex := string(c[2:4])
-	bHex := string(c[4:6])
+	rHex := hex[0:2]
+	gHex := hex[2:4]
+	bHex := hex[4:6]
 
 	r, err = hexStrToUint(rHex)
 	if err != nil {

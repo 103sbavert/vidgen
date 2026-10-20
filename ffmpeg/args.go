@@ -74,13 +74,29 @@ func nativeArgs(cfg config.VideoConfig, l render.Layout, output string, frameCou
 // the gradient expression. Length lives in output -t only (the nullsrc input
 // is left endless). No shell is involved, so geq needs no quoting. Colors go
 // through ffmpeg's default RGB->YUV conversion, so no color tags are written.
-func geqArgs(cfg config.VideoConfig, expr, output string) []string {
+//
+// A non-empty overlayPNG (full-frame, transparent) is composited over the
+// gradient with ffmpeg's overlay filter; ffmpeg repeats the single image for
+// the whole clip.
+func geqArgs(cfg config.VideoConfig, expr, overlayPNG, output string) []string {
 	args := []string{
 		binary, "-y",
 		"-f", "lavfi",
 		"-i", "nullsrc=s=" + string(cfg.Resolution) + ":r=" + strconv.Itoa(cfg.Framerate),
-		"-vf", expr,
 	}
+
+	if overlayPNG == "" {
+		args = append(args, "-vf", expr)
+	} else {
+		args = append(args,
+			"-i", overlayPNG,
+			// The explicit format keeps overlay from negotiating a different
+			// layout for the gradient, which thickens the text.
+			"-filter_complex", "[0:v]"+expr+",format=gbrp[bg];[bg][1:v]overlay=format=auto[out]",
+			"-map", "[out]",
+		)
+	}
+
 	args = append(args, codecArgs(cfg, 0)...)
 
 	return append(args, "-t", strconv.Itoa(cfg.Duration), output)

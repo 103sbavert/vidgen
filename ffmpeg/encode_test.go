@@ -3,6 +3,7 @@ package ffmpeg
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,8 +116,20 @@ func TestEncodeGeq(t *testing.T) {
 func psnr(t *testing.T, a, b string) float64 {
 	t.Helper()
 
+	return psnrFiltered(t, a, b, "")
+}
+
+// psnrFiltered is psnr after applying an extra filter (e.g. a crop) to both
+// clips; pre may be empty.
+func psnrFiltered(t *testing.T, a, b, pre string) float64 {
+	t.Helper()
+
+	if pre != "" {
+		pre += ","
+	}
+
 	out, err := exec.Command("ffmpeg", "-hide_banner", "-i", a, "-i", b,
-		"-filter_complex", "[0:v]format=gbrp[a];[1:v]format=gbrp[b];[a][b]psnr",
+		"-filter_complex", "[0:v]"+pre+"format=gbrp[a];[1:v]"+pre+"format=gbrp[b];[a][b]psnr",
 		"-f", "null", "-").CombinedOutput()
 	if err != nil {
 		t.Fatalf("ffmpeg psnr: %v\n%s", err, out)
@@ -168,6 +181,7 @@ func TestNativeMatchesGeqReference(t *testing.T) {
 			cfg.LinearAngle = tc.angle
 			cfg.Duration = 1
 			cfg.Bitrate = 20_000_000
+			cfg.Text = new(string) // no overlay: compare the gradients alone
 
 			if err := Encode(context.Background(), cfg, Options{}); err != nil {
 				t.Fatalf("%s %s: %v", tc.name, engine, err)
@@ -184,6 +198,82 @@ func TestNativeMatchesGeqReference(t *testing.T) {
 		if db < minPSNR {
 			t.Errorf("%s: native vs geq PSNR %.1f dB, want >= %.0f", tc.name, db, minPSNR)
 		}
+	}
+}
+
+// Both engines rasterize the text with the same code and must put it in the
+// same place. Inside the text's bounding box the engines agree far better with
+// each other than either does with a clip that has no text at all.
+func TestOverlayEnginesAgree(t *testing.T) {
+	dir := t.TempDir()
+
+	render := func(name, engine, text string) string {
+		cfg, _ := endToEndConfig(t)
+		out := filepath.Join(dir, name+".mp4")
+
+		cfg.Output = &out
+		cfg.Engine = engine
+		cfg.Text = &text
+		cfg.Duration = 1
+		cfg.Bitrate = 20_000_000
+
+		if err := Encode(context.Background(), cfg, Options{}); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		return out
+	}
+
+	const text = "Hello\nvidgen"
+
+	native := render("native", config.EngineNative, text)
+	reference := render("geq", config.EngineGeq, text)
+	blank := render("blank", config.EngineNative, "")
+
+	cfg, _ := endToEndConfig(t)
+	cfg.Text = new(string)
+	*cfg.Text = text
+
+	txt, err := buildText(cfg)
+	if err != nil || txt == nil {
+		t.Fatalf("buildText: %v, %v", txt, err)
+	}
+
+	m := txt.mask
+	crop := fmt.Sprintf("crop=%d:%d:%d:%d", m.W, m.H, m.X, m.Y)
+
+	agree := psnrFiltered(t, native, reference, crop)
+	vsBlank := psnrFiltered(t, native, blank, crop)
+	t.Logf("text box PSNR: native vs geq %.1f dB, native vs no text %.1f dB", agree, vsBlank)
+
+	if agree < vsBlank+8 {
+		t.Errorf("engines disagree on text: %.1f dB vs %.1f dB for a clip without text", agree, vsBlank)
+	}
+}
+
+// An empty text string disables the overlay entirely.
+func TestEmptyTextDrawsNothing(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.Text = new(string)
+
+	if txt, err := buildText(cfg); err != nil || txt != nil {
+		t.Errorf("buildText = %v, %v; want nil, nil", txt, err)
+	}
+
+	cfg.Text = nil // metadata overlay
+
+	txt, err := buildText(cfg)
+	if err != nil || txt == nil || txt.mask.Empty() {
+		t.Errorf("metadata overlay missing: %v, %v", txt, err)
+	}
+}
+
+func TestBuildTextRejectsBadColor(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.FontColor = "nothex"
+
+	if _, err := buildText(cfg); err == nil {
+		t.Error("bad font_color accepted")
 	}
 }
 

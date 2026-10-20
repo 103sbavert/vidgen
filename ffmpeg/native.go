@@ -9,7 +9,8 @@ import (
 	"sbavert/vidgen/render"
 )
 
-// newSource builds the native frame generator for the configured gradient.
+// newSource builds the native frame generator for the configured gradient,
+// with the text overlay (if any) composited on every frame.
 func newSource(cfg config.VideoConfig) (render.Source, error) {
 	g, err := gradient.New(cfg)
 	if err != nil {
@@ -21,7 +22,21 @@ func newSource(cfg config.VideoConfig) (render.Source, error) {
 		return nil, err
 	}
 
-	return render.NewBanded(g, w, h, cfg.TotalFrames())
+	banded, err := render.NewBanded(g, w, h, cfg.TotalFrames())
+	if err != nil {
+		return nil, err
+	}
+
+	txt, err := buildText(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if txt == nil {
+		return banded, nil
+	}
+
+	return render.WithOverlay(banded, render.NewOverlay(banded.Layout(), txt.mask, txt.color)), nil
 }
 
 // encodeNative renders frames in Go and pipes them into ffmpeg, as one

@@ -111,7 +111,7 @@ func TestGeqArgsSharePresetAndSkipColorTags(t *testing.T) {
 	preset := "fast"
 	cfg.Preset = &preset
 
-	args := geqArgs(cfg, "geq=r=1", "o.mp4")
+	args := geqArgs(cfg, "geq=r=1", "", "o.mp4")
 
 	for _, want := range [][]string{
 		{"-vf", "geq=r=1"},
@@ -126,6 +126,26 @@ func TestGeqArgsSharePresetAndSkipColorTags(t *testing.T) {
 
 	if slices.Contains(args, "-colorspace") {
 		t.Errorf("geq output must stay untagged: %v", args)
+	}
+}
+
+func TestGeqArgsOverlayUsesFilterComplex(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+
+	args := geqArgs(cfg, "geq=r=1", "/tmp/text.png", "o.mp4")
+
+	for _, want := range [][]string{
+		{"-i", "/tmp/text.png"},
+		{"-filter_complex", "[0:v]geq=r=1,format=gbrp[bg];[bg][1:v]overlay=format=auto[out]"},
+		{"-map", "[out]"},
+	} {
+		if !containsPair(args, want[0], want[1]) {
+			t.Errorf("args missing %v: %v", want, args)
+		}
+	}
+
+	if slices.Contains(args, "-vf") {
+		t.Errorf("overlay path must not use -vf: %v", args)
 	}
 }
 
