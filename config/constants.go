@@ -56,5 +56,5 @@ var codecExtMap = map[string]string{
 
 var RegexPatterns = regexPatterns{
 	resolutionRegex: regexp.MustCompile(`^(\d{3,4})x(\d{3,4})$`),
-	colorRegex:      regexp.MustCompile(`^#?([0-9a-fA-F]{6})$`),
+	colorRegex:      regexp.MustCompile(`^([0-9a-fA-F]{6})$`),
 }
