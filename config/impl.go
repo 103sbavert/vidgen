@@ -1,20 +1,32 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 )
 
-func (c *VideoConfig) GetAutomaticFilename() string {
-	ext := c.Codec.FormatExtension
-	if ext == "" {
-		ext = ExtMp4
-	}
-	return fmt.Sprintf("%s_%s_%dfps_%dbps_%ds%s", c.GradientType, c.Resolution, c.Framerate, c.Bitrate, c.Duration, ext)
+// fileExists reports whether path exists. Any stat error counts as absent;
+// genuine I/O failures surface when the path is actually used.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
+// cyclePalette expands or truncates Colors to NbColors by cycling the palette.
+// NbColors wins over len(Colors); a non-positive NbColors leaves Colors as-is.
+func (c *VideoConfig) cyclePalette() {
+	if c.NbColors < 1 || len(c.Colors) == 0 || len(c.Colors) == c.NbColors {
+		return
+	}
+	cycled := make([]Color, c.NbColors)
+	for i := range cycled {
+		cycled[i] = c.Colors[i%len(c.Colors)]
+	}
+	c.Colors = cycled
+}
+
+// ParseHex splits a 6-digit hex color into 8-bit RGB channels.
 func (c Color) ParseHex() (r, g, b uint8, err error) {
 	if len(c) != 6 {
 		return 0, 0, 0, fmt.Errorf("invalid hex color %q: must be 6 hex digits", string(c))
@@ -44,37 +56,4 @@ func (c Color) ParseHex() (r, g, b uint8, err error) {
 	b = uint8(bUint)
 
 	return r, g, b, nil
-}
-
-func LoadJSONFile(configPath *string) VideoConfig {
-	localConfig := DefaultConfig
-
-	bytes, err := os.ReadFile(*configPath)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	err = json.Unmarshal(bytes, &localConfig)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	localConfig.cyclePalette()
-
-	return localConfig
-}
-
-// cyclePalette expands or truncates Colors to NbColors by cycling the palette.
-// NbColors wins over len(Colors); a non-positive NbColors leaves Colors as-is.
-func (c *VideoConfig) cyclePalette() {
-	if c.NbColors < 1 || len(c.Colors) == 0 || len(c.Colors) == c.NbColors {
-		return
-	}
-	cycled := make([]Color, c.NbColors)
-	for i := range cycled {
-		cycled[i] = c.Colors[i%len(c.Colors)]
-	}
-	c.Colors = cycled
 }

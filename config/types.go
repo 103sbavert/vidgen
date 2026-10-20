@@ -1,3 +1,5 @@
+// Package config defines, loads, and validates the video specification
+// used by vidgen.
 package config
 
 import (
@@ -6,20 +8,20 @@ import (
 
 type VideoConfig struct {
 	Output       *string         `json:"output"`
-	Resolution   VideoResolution `json:"resolution"`
-	Framerate    int             `json:"framerate"`
-	Bitrate      int             `json:"bitrate"`
-	Codec        VideoCodec      `json:"codec"`
-	Duration     int             `json:"duration"`
+	Resolution   VideoResolution `json:"resolution" validate:"required,resolution"`
+	Framerate    int             `json:"framerate" validate:"gt=0,lte=120"`
+	Bitrate      int             `json:"bitrate" validate:"gt=0"`
+	Codec        VideoCodec      `json:"codec" validate:"required"`
+	Duration     int             `json:"duration" validate:"gt=0"`
 	Text         *string         `json:"text"`
-	NbColors     int             `json:"nb_colors"`
-	Speed        float64         `json:"speed"`
-	GradientType string          `json:"gradient_type"`
-	LinearAngle  int             `json:"linear_angle"`
+	NbColors     int             `json:"nb_colors" validate:"gt=0,lte=16"`
+	Speed        float64         `json:"speed" validate:"gt=0"`
+	GradientType string          `json:"gradient_type" validate:"required,oneof=radial"`
+	LinearAngle  int             `json:"linear_angle" validate:"min=0,max=360"`
 	Seed         *int            `json:"seed"`
-	FontSize     *int            `json:"font_size"`
-	FontColor    Color           `json:"font_color"`
-	Colors       []Color         `json:"colors"`
+	FontSize     *int            `json:"font_size" validate:"omitempty,gt=0"`
+	FontColor    Color           `json:"font_color" validate:"required,color"`
+	Colors       []Color         `json:"colors" validate:"dive,color"`
 }
 
 type Color string
@@ -27,8 +29,8 @@ type Color string
 type VideoResolution string
 
 type VideoCodec struct {
-	Name            string
-	FormatExtension string
+	Name            string `validate:"required"`
+	FormatExtension string `validate:"required"`
 }
 
 type regexPatterns struct {
