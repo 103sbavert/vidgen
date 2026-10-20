@@ -32,11 +32,11 @@ for a ready-to-copy template.
 | `bitrate`       | int          | `2097152`       | Video bitrate in bits per second.                                                                                                                                                      |
 | `codec`         | string       | `"libx264"`     | FFmpeg video codec. See codec table below.                                                                                                                                             |
 | `duration`      | int          | `30`            | Length in seconds.                                                                                                                                                                     |
-| `text`          | string\|null | `null`          | Static text overlay, centered; `\n` starts a new line. If `null`, shows video metadata (resolution, fps, format, codec, duration). An empty string `""` draws no text.³                 |
-| `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled: `height / 12` (min 24) for custom text, `height / 28` (min 14) for the metadata block.                                                     |
+| `text`          | string\|null | `null`          | Static text overlay, centered; `\n` starts a new line. If `null`, shows video metadata (resolution, fps, format, codec, duration). An empty string `""` draws no text.³                |
+| `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled: `height / 12` (min 24) for custom text, `height / 28` (min 14) for the metadata block.                                                    |
 | `font_color`    | string       | `"black"`       | Text color: `RRGGBB` hex (optional `#`) or one of `black`, `white`, `red`, `green`, `blue` (soft shades, not pure).                                                                    |
 | `gradient_type` | string       | `"radial"`      | One of: `linear`, `radial`, `circular`, `spiral`, `square`. `linear` and `radial` are implemented so far.                                                                              |
-| `linear_angle`  | int          | `0`             | Direction of the `linear` gradient in degrees, 0–360 (0 = left→right, 90 = top→bottom, 180 = right→left, 270 = bottom→top). Has no effect on other gradient types.                    |
+| `linear_angle`  | int          | `0`             | Direction of the `linear` gradient in degrees, 0–360 (0 = left→right, 90 = top→bottom, 180 = right→left, 270 = bottom→top). Has no effect on other gradient types.                     |
 | `colors`        | string[]     | pastel palette² | List of hex color strings (without `#`).                                                                                                                                               |
 | `nb_colors`     | int          | `4`             | How many colors to use from `colors`. Cycles if fewer than requested.                                                                                                                  |
 | `speed`         | float        | `0.08`          | Animation speed in color-cycles per second.                                                                                                                                            |
@@ -53,8 +53,8 @@ variables, output directories) is not implemented yet.
 ² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
 
 > [!NOTE]
-³ Text is rendered with the bundled Noto Sans Regular, anti-aliased, and drawn
-identically by both engines (see [Text overlay](#text-overlay)).
+> ³ Text is rendered with the bundled Noto Sans Regular, anti-aliased, and drawn
+> identically by both engines (see [Text overlay](#text-overlay)).
 
 > [!NOTE]
 > `speed` and `seed` are accepted and validated but not used by any engine
@@ -110,15 +110,15 @@ libx264
 
 ### Project layout
 
-| Package        | Role                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| `config`       | Load, default, validate the JSON config; codec table; output path.                      |
-| `gradient`     | Engine-independent gradient math: `Shape` (radial, linear) + `Bands` colors (`Bands.ColorAt` is the canonical definition). |
-| `render`       | Native frame generation: position `Field`, per-frame color `Table`, text `Overlay`, ordered `Stream`. |
-| `caption`      | Text layout and rasterization into a coverage mask.                                      |
-| `fonts`        | The embedded typeface.                                                                   |
-| `ffmpeg`       | `Encode`: spawns ffmpeg, plans segments, atomic output. `ffmpeg/geq` is the slow engine. |
-| `progress`     | Terminal progress line fed by a per-frame callback.                                      |
+| Package    | Role                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `config`   | Load, default, validate the JSON config; codec table; output path.                                                         |
+| `gradient` | Engine-independent gradient math: `Shape` (radial, linear) + `Bands` colors (`Bands.ColorAt` is the canonical definition). |
+| `render`   | Native frame generation: position `Field`, per-frame color `Table`, text `Overlay`, ordered `Stream`.                      |
+| `caption`  | Text layout and rasterization into a coverage mask.                                                                        |
+| `fonts`    | The embedded typeface.                                                                                                     |
+| `ffmpeg`   | `Encode`: spawns ffmpeg, plans segments, atomic output. `ffmpeg/geq` is the slow engine.                                   |
+| `progress` | Terminal progress line fed by a per-frame callback.                                                                        |
 
 Adding a gradient type: add a `Shape` and a case in `gradient.New`, plus a
 matching expression in `ffmpeg/geq`'s `shapeExpr`. The native renderer
@@ -131,13 +131,13 @@ Implemented gradients share one animation: the bands start at unequal widths
 (the first color widest) and drift toward equal widths over the clip, with soft
 S-curve edges.
 
-| Type       | Shape                    | Animation                            | Status      |
-| ---------- | ------------------------ | ------------------------------------ | ----------- |
+| Type       | Shape                                                                | Animation                        | Status      |
+| ---------- | -------------------------------------------------------------------- | -------------------------------- | ----------- |
 | `linear`   | Parallel stripes, first color at the start edge (see `linear_angle`) | Stripes drift toward equal width | implemented |
-| `radial`   | Soft rings from center, first color outermost | Rings drift toward equal width | implemented |
-| `circular` | Tighter concentric rings (3× frequency) | planned | not yet |
-| `spiral`   | Archimedean spiral | planned | not yet |
-| `square`   | Concentric rectangles | planned | not yet |
+| `radial`   | Soft rings from center, first color outermost                        | Rings drift toward equal width   | implemented |
+| `circular` | Tighter concentric rings (3× frequency)                              | planned                          | not yet     |
+| `spiral`   | Archimedean spiral                                                   | planned                          | not yet     |
+| `square`   | Concentric rectangles                                                | planned                          | not yet     |
 
 ### Codec → container mapping
 
