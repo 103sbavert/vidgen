@@ -21,7 +21,7 @@ func BuildArgs(cfg config.VideoConfig, geq string) []string {
 		"-f", "lavfi",
 		"-i", "nullsrc=s=" + string(cfg.Resolution) + ":r=" + fps,
 		"-vf", geq,
-		"-c:v", cfg.Codec.Name,
+		"-c:v", cfg.Codec,
 		"-r", fps,
 		"-b:v", strconv.Itoa(cfg.Bitrate),
 		"-pix_fmt", "yuv420p",

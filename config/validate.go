@@ -46,15 +46,12 @@ func getValidator() *validator.Validate {
 		})
 
 		// Register custom validation for VideoCodec name against validCodecs map
-		validate.RegisterStructValidation(func(sl validator.StructLevel) {
-			codec, ok := sl.Current().Interface().(VideoCodec)
-			if !ok {
-				return
-			}
-			if _, exists := validCodecs[codec.Name]; !exists {
-				sl.ReportError(codec.Name, "Name", "Codec", "validcodec", "")
-			}
-		}, VideoCodec{})
+		validate.RegisterValidation("codec", func(fl validator.FieldLevel) bool {
+			val := fl.Field().String()
+
+			_, err := codecExtMap[val]
+			return err
+		})
 	})
 	return validate
 }

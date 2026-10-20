@@ -11,7 +11,7 @@ type VideoConfig struct {
 	Resolution   VideoResolution `json:"resolution" validate:"required,resolution"`
 	Framerate    int             `json:"framerate" validate:"gt=0,lte=120"`
 	Bitrate      int             `json:"bitrate" validate:"gt=0"`
-	Codec        VideoCodec      `json:"codec" validate:"required"`
+	Codec        string          `json:"codec" validate:"required,codec"`
 	Duration     int             `json:"duration" validate:"gt=0"`
 	Text         *string         `json:"text"`
 	NbColors     int             `json:"nb_colors" validate:"gt=0,lte=16"`

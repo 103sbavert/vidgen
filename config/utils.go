@@ -11,7 +11,7 @@ import (
 // ({gradient}_{res}_{fps}fps_{bitrate}bps_{duration}s{ext}) with the extension
 // from the codec map, falling back to .mp4.
 func getAutomaticFilename(c VideoConfig) string {
-	ext := c.Codec.FormatExtension
+	ext := codecExtMap[c.Codec]
 	if ext == "" {
 		ext = ExtMp4
 	}
@@ -25,7 +25,7 @@ func GetDefaultConfig() VideoConfig {
 		Resolution:   VideoResolution("1920x1080"),
 		Framerate:    24,
 		Bitrate:      2097152,
-		Codec:        validCodecs["libx264"],
+		Codec:        "libx264",
 		Duration:     30,
 		NbColors:     4,
 		Speed:        0.08,
