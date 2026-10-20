@@ -1,43 +1,19 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
+	"os/signal"
+	"syscall"
 
 	"sbavert/vidgen/config"
 	"sbavert/vidgen/ffmpeg"
+	"sbavert/vidgen/progress"
 
 	"github.com/spf13/cobra"
 )
-
-func LoadConfig(p string) (cfg config.VideoConfig, err error) {
-	if p == "" {
-		cfg = config.GetDefaultConfig()
-	} else {
-		p, err = filepath.Abs(p)
-		if err != nil {
-			return
-		}
-
-		cfg, err = config.ReadConfigFile(&p)
-		if err != nil {
-			return
-		}
-	}
-
-	if err = cfg.Validate(); err != nil {
-		return
-	}
-
-	err = cfg.CalcOutputPath()
-	if err != nil {
-		return
-	}
-
-	return
-}
 
 func main() {
 	var configPath string
@@ -49,31 +25,39 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := exec.LookPath("ffmpeg"); err != nil {
-				return fmt.Errorf("ffmpeg not found on PATH: install ffmpeg to encode video")
-			}
-
-			var cfg config.VideoConfig
-			var err error
-
-			cfg, err = LoadConfig(configPath)
+			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}
 
-			if err := ffmpeg.Render(cfg); err != nil {
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			bar := progress.New(os.Stderr, cfg.TotalFrames())
+			stopBar := bar.Start()
+
+			err = ffmpeg.Encode(ctx, cfg, ffmpeg.Options{OnFrame: bar.Tick})
+			stopBar()
+
+			if err != nil {
 				return err
 			}
 
 			fmt.Printf("wrote %s\n", *cfg.Output)
+
 			return nil
 		},
 	}
 
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "path to JSON config file (defaults when omitted)")
 
-	if err := rootCmd.Execute(); err != nil {
+	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+
+		if errors.Is(err, ffmpeg.ErrInterrupted) {
+			os.Exit(130)
+		}
+
 		os.Exit(1)
 	}
 }
