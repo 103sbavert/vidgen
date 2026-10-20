@@ -39,7 +39,7 @@ func GetDefaultConfig() VideoConfig {
 
 // ReadConfigFile reads the JSON config at p (path-like string) over a copy of
 // GetDefaultConfig, so missing keys keep defaults, then normalizes the palette to
-// NbColors. Unreadable or invalid input exits the process non-zero.
+// NbColors. Unreadable or invalid input returns an error.
 func ReadConfigFile(p *string) (cfg VideoConfig, err error) {
 	cfg = GetDefaultConfig()
 
@@ -59,9 +59,9 @@ func ReadConfigFile(p *string) (cfg VideoConfig, err error) {
 	return
 }
 
-// nextAvailableFilename returns the first available file name, using c.Output
-// if it is set or getAutomaticFilename() if unset. Appends a numbered suffix
-// if the name is not available.
+// nextAvailableFilename returns the first free automatic file name: the
+// getAutomaticFilename() result, with a numbered suffix (_1, _2, ...) appended
+// to the stem if that name is taken.
 func nextAvailableFilename(c VideoConfig) string {
 	base := getAutomaticFilename(c)
 

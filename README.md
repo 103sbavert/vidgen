@@ -36,7 +36,7 @@ for a ready-to-copy template.
 | `font_size`     | int\|null    | `null`          | Font size in pixels. If `null`, auto-scaled to `height / 12` (e.g. 60px at 720p).                                                                                                      |
 | `font_color`    | string       | `"black"`       | Text color — HTML name or `#RRGGBB`.                                                                                                                                                   |
 | `gradient_type` | string       | `"radial"`      | One of: `linear`, `radial`, `circular`, `spiral`, `square`. Only `radial` is implemented so far.                                                                                       |
-| `linear_angle`  | float        | `0`             | Rotation of the `linear` gradient in degrees (0 = horizontal, 90 = vertical). Has no effect on other gradient types.                                                                   |
+| `linear_angle`  | int          | `0`             | Rotation of the `linear` gradient in degrees (0 = horizontal, 90 = vertical). Has no effect on other gradient types.                                                                   |
 | `colors`        | string[]     | pastel palette² | List of hex color strings (without `#`).                                                                                                                                               |
 | `nb_colors`     | int          | `4`             | How many colors to use from `colors`. Cycles if fewer than requested.                                                                                                                  |
 | `speed`         | float        | `0.08`          | Animation speed in color-cycles per second.                                                                                                                                            |
@@ -46,12 +46,15 @@ for a ready-to-copy template.
 | `segments`      | int          | `0`             | Parallel encode segments for the native engine. `0` = auto, `1` = off. See [Performance](#performance).                                                                                |
 | `preset`        | string\|null | `null`          | Passed to ffmpeg as `-preset` when set (e.g. `veryfast` for libx264/libx265).                                                                                                          |
 
-¹ Environment variables and shell metacharacters characters are expanded if a
-value is specified. If the value points to a directory that exists on the
-system, the file is created inside that directory using the auto-generated
-path.
+¹ An explicit `output` is used as-is; if that file already exists vidgen stops
+with an error instead of overwriting it. Path expansion (environment
+variables, output directories) is not implemented yet.
 
 ² Default palette: `546B41`, `99AD7A`, `DCCCAC`, `FFF8EC`
+
+> [!NOTE]
+> `text`, `font_size`, `font_color`, `linear_angle`, `speed` and `seed` are
+> accepted and validated but not used by any engine yet.
 
 ![palette](palette.png)
 

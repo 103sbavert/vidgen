@@ -51,8 +51,8 @@ func getValidator() *validator.Validate {
 		validate.RegisterValidation("codec", func(fl validator.FieldLevel) bool {
 			val := fl.Field().String()
 
-			_, err := codecExtMap[val]
-			return err
+			_, ok := codecExtMap[val]
+			return ok
 		})
 	})
 	return validate
