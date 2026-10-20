@@ -5,111 +5,8 @@ import (
 	"strings"
 
 	"sbavert/vidgen/config"
+	"sbavert/vidgen/gradient"
 )
-
-// smoothstepSigma is the half-width of the fuzzy transition zone around each
-// ring boundary fence (see buildSmoothstepTerm).
-const smoothstepSigma = 0.05
-
-// ringWidth returns the initial fractional width of one ring on the 0→1 radius ruler.
-// Colors in config are ordered outermost-first, so n=0 is the widest ring.
-//
-// Formula: 2*(N-n) / (N*(N+1))
-//
-// For the 4 given colors (N=4):
-//
-//	n=0 → 2*4/20 = 0.40  (546B41,  outermost, widest)
-//	n=1 → 2*3/20 = 0.30  (99AD7A)
-//	n=2 → 2*2/20 = 0.20  (DCCCAC)
-//	n=3 → 2*1/20 = 0.10  (FFF8EC, innermost, narrowest)
-//
-// These sum to exactly 1.0 for any N, so the rings always fill the full radius.
-func ringInitialWidth(n, N int) float64 {
-	ringIndex := float64(n)
-	totalRings := float64(N)
-
-	return 2 * (totalRings - ringIndex) / (totalRings * (totalRings + 1))
-}
-
-// boundaryConstants returns the intercept and slope that fully describe how
-// boundary k animates over time. Boundaries are numbered 1 through N-1,
-// from inside outward; boundary k sits between the k-th and (k+1)-th ring
-// from the center.
-//
-// intercept = fence position at T=0
-//
-//	= sum of initial widths of the k innermost rings
-//	= k*(k+1) / (N*(N+1))   ← closed-form, no loop needed
-//
-// target = fence position at T=end (all rings equal width)
-//
-//	= k / N
-//
-// slope = target - intercept (total distance the fence travels)
-//
-// At any time T: fence position = intercept + slope*(T/duration)
-//
-// For N=4, the 3 fences are:
-//
-//	k=1: intercept=0.10, target=0.25, slope=+0.15
-//	k=2: intercept=0.30, target=0.50, slope=+0.20
-//	k=3: intercept=0.60, target=0.75, slope=+0.15
-
-func boundaryConstants(k, N int) (intercept, slope float64) {
-	boundaryIndex := float64(k)
-	totalRings := float64(N)
-
-	intercept = boundaryIndex * (boundaryIndex + 1) / (totalRings * (totalRings + 1))
-	target := boundaryIndex / totalRings
-	slope = target - intercept
-
-	return intercept, slope
-}
-
-// colorDeltas computes, for each fence between adjacent rings, the RGB shift
-// applied when crossing that fence. Colors in config are outermost-first;
-// fences are innermost-first, so the delta at fence k is color[N-1-k] minus
-// color[N-k] (one step outward minus one step inward).
-//
-// For N=4:
-//
-//	fence 1 (innermost): DCCCAC - FFF8EC = (-35, -44, -64)
-//	fence 2 (middle):    99AD7A - DCCCAC = (-67, -31, -50)
-//	fence 3 (outermost): 546B41 - 99AD7A = (-69, -66, -57)
-//
-// Deltas may be positive, negative, or mixed depending on input colors.
-// Returns a slice of [3]int16 (index 0=R, 1=G, 2=B), ordered innermost
-// fence first. Parse errors for individual colors are collected and returned
-// alongside any successfully computed deltas.
-func colorDeltas(colors []config.Color) (deltas [][3]int16, errorList []error) {
-	lastIndex := len(colors) - 1
-
-	for i := lastIndex - 1; i >= 0; i-- {
-		innerColor := colors[i+1]
-		outerColor := colors[i]
-
-		innerR, innerG, innerB, errInner := innerColor.ParseHex()
-		outerR, outerG, outerB, errOuter := outerColor.ParseHex()
-
-		if errInner != nil {
-			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", innerColor, i+1, errInner))
-		}
-
-		if errOuter != nil {
-			errorList = append(errorList, fmt.Errorf("could not parse ring color %s at position %d: %w", outerColor, i, errOuter))
-		}
-
-		if errInner != nil || errOuter != nil {
-			continue
-		}
-
-		currDelta := [3]int16{int16(outerR) - int16(innerR), int16(outerG) - int16(innerG), int16(outerB) - int16(innerB)}
-
-		deltas = append(deltas, currDelta)
-	}
-
-	return
-}
 
 // buildSmoothstepTerm builds one geq string fragment representing a single fence's color contribution
 // to one channel. This fragment is one term in the final addition/subtraction chain.
@@ -188,7 +85,7 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 	// Store each fence position at current time
 	// Slot 2 = fence 1, slot 3 = fence 2, etc.
 	for k := 1; k < N; k++ {
-		intercept, slope := boundaryConstants(k, N)
+		intercept, slope := gradient.BoundaryConstants(k, N)
 		slot := k + 1
 		fmt.Fprintf(&expr, "st(%d,%f+%f*ld(1));", slot, intercept, slope)
 	}
@@ -212,56 +109,32 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 // BuildRadialGeq is the entry point. Reads colors and duration from config,
 // runs all the math, and returns the complete geq filter string for ffmpeg's -vf flag.
 //
-// Calls parseHexColor on each color, colorDeltas for all fence shifts,
-// boundaryConstants for all fence positions, then buildChannelExpr
+// Builds a gradient.Radial spec from the palette, then buildChannelExpr
 // three times (once per channel), and joins them as:
 //
 //	"geq=r='...':g='...':b='..."
 //
 // Returns an error if any color string is malformed or Colors slice is empty.
 func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
-	N := len(cfg.Colors)
-
-	if N == 0 {
-		return "", fmt.Errorf("no colors provided")
-	}
-
-	if N == 1 {
-		return "", fmt.Errorf("need at least 2 colors for a gradient")
-	}
-
-	// Get the innermost color (last in the slice)
-	innermost := cfg.Colors[N-1]
-	innerR, innerG, innerB, err := innermost.ParseHex()
+	spec, err := gradient.NewRadial(cfg.Colors)
 	if err != nil {
-		return "", fmt.Errorf("invalid innermost color %s: %w", innermost, err)
+		return "", err
 	}
 
-	// Compute all fence deltas
-	deltas, errors := colorDeltas(cfg.Colors)
-	if len(errors) > 0 {
-		// Aggregate errors
-		return "", fmt.Errorf("color parsing errors: %v", errors)
-	}
-
-	if len(deltas) != N-1 {
-		return "", fmt.Errorf("expected %d deltas, got %d", N-1, len(deltas))
-	}
+	N := len(cfg.Colors)
 
 	// Extract per-channel deltas
 	var deltaR, deltaG, deltaB []int16
-	for _, d := range deltas {
+	for _, d := range spec.Deltas {
 		deltaR = append(deltaR, d[0])
 		deltaG = append(deltaG, d[1])
 		deltaB = append(deltaB, d[2])
 	}
 
-	sigma := smoothstepSigma
-
 	// Build each channel expression
-	rExpr := buildChannelExpr(int(innerR), deltaR, N, sigma, cfg.Duration)
-	gExpr := buildChannelExpr(int(innerG), deltaG, N, sigma, cfg.Duration)
-	bExpr := buildChannelExpr(int(innerB), deltaB, N, sigma, cfg.Duration)
+	rExpr := buildChannelExpr(int(spec.Base[0]), deltaR, N, spec.Sigma, cfg.Duration)
+	gExpr := buildChannelExpr(int(spec.Base[1]), deltaG, N, spec.Sigma, cfg.Duration)
+	bExpr := buildChannelExpr(int(spec.Base[2]), deltaB, N, spec.Sigma, cfg.Duration)
 
 	return fmt.Sprintf("geq=r='%s':g='%s':b='%s'", rExpr, gExpr, bExpr), nil
 }
