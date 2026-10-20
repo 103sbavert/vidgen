@@ -108,7 +108,7 @@ func colorDeltas(colors []config.Color) (deltas [][3]int16, errorList []error) {
 		deltas = append(deltas, currDelta)
 	}
 
-	return deltas, errorList
+	return
 }
 
 // buildSmoothstepTerm builds one geq string fragment representing a single fence's color contribution

@@ -13,6 +13,16 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+// hexStrToUint converts a `hex` given string into a int64 go integer
+func hexStrToUint(hex string) (uint8, error) {
+	d, err := strconv.ParseUint(hex, 16, 8)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint8(d), nil
+}
+
 // cyclePalette expands or truncates Colors to NbColors by cycling the palette.
 // NbColors wins over len(Colors); a non-positive NbColors leaves Colors as-is.
 func (c *VideoConfig) cyclePalette() {
@@ -29,33 +39,33 @@ func (c *VideoConfig) cyclePalette() {
 // ParseHex splits a 6-digit hex color into 8-bit RGB channels.
 func (c Color) ParseHex() (r, g, b uint8, err error) {
 	if len(c) != 6 {
-		return 0, 0, 0, fmt.Errorf("invalid hex color %q: must be 6 hex digits", string(c))
+		err = fmt.Errorf("invalid hex color %q: must be 6 hex digits", string(c))
+		return
 	}
 
 	rHex := string(c[0:2])
 	gHex := string(c[2:4])
 	bHex := string(c[4:6])
 
-	rUint, err := strconv.ParseUint(rHex, 16, 8)
+	r, err = hexStrToUint(rHex)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid red hex %s: %w", rHex, err)
+		err = fmt.Errorf("invalid red hex %s: %w", rHex, err)
+		return
 	}
 
-	gUint, err := strconv.ParseUint(gHex, 16, 8)
+	g, err = hexStrToUint(gHex)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid green hex %s: %w", gHex, err)
+		err = fmt.Errorf("invalid green hex %s: %w", gHex, err)
+		return
 	}
 
-	bUint, err := strconv.ParseUint(bHex, 16, 8)
+	b, err = hexStrToUint(bHex)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid blue hex %s: %w", bHex, err)
+		err = fmt.Errorf("invalid blue hex %s: %w", bHex, err)
+		return
 	}
 
-	r = uint8(rUint)
-	g = uint8(gUint)
-	b = uint8(bUint)
-
-	return r, g, b, nil
+	return
 }
 
 func (c VideoConfig) CalcOutputPath() error {

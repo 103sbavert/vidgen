@@ -39,22 +39,23 @@ func GetDefaultConfig() VideoConfig {
 // ReadConfigFile reads the JSON config at p (path-like string) over a copy of
 // GetDefaultConfig, so missing keys keep defaults, then normalizes the palette to
 // NbColors. Unreadable or invalid input exits the process non-zero.
-func ReadConfigFile(p *string) (VideoConfig, error) {
-	localConfig := GetDefaultConfig()
+func ReadConfigFile(p *string) (cfg VideoConfig, err error) {
+	cfg = GetDefaultConfig()
 
 	bytes, err := os.ReadFile(*p)
 	if err != nil {
-		return VideoConfig{}, fmt.Errorf("failed to open config file: %w", err)
+		err = fmt.Errorf("failed to open config file: %w", err)
+		return
 	}
 
-	err = json.Unmarshal(bytes, &localConfig)
+	err = json.Unmarshal(bytes, &cfg)
 	if err != nil {
-		return VideoConfig{}, fmt.Errorf("failed to unmarshal config JSON: %w", err)
+		err = fmt.Errorf("failed to unmarshal config JSON: %w", err)
+		return
 	}
 
-	localConfig.cyclePalette()
-
-	return localConfig, nil
+	cfg.cyclePalette()
+	return
 }
 
 // nextAvailableFilename returns the first available file name, using c.Output

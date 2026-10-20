@@ -18,26 +18,25 @@ func LoadConfig(p string) (cfg config.VideoConfig, err error) {
 	} else {
 		p, err = filepath.Abs(p)
 		if err != nil {
-			return cfg, err
+			return
 		}
 
 		cfg, err = config.ReadConfigFile(&p)
 		if err != nil {
-			return cfg, err
+			return
 		}
-
 	}
 
 	if err = cfg.Validate(); err != nil {
-		return cfg, err
+		return
 	}
 
 	err = cfg.CalcOutputPath()
 	if err != nil {
-		return cfg, err
+		return
 	}
 
-	return cfg, nil
+	return
 }
 
 func main() {
