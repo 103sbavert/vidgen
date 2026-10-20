@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -11,9 +12,9 @@ import (
 // ({gradient}_{res}_{fps}fps_{bitrate}bps_{duration}s{ext}) with the extension
 // from the codec map, falling back to .mp4.
 func getAutomaticFilename(c VideoConfig) string {
-	ext := codecExtMap[c.Codec]
-	if ext == "" {
-		ext = ExtMp4
+	ext := ExtMp4
+	if info, ok := LookupCodec(c.Codec); ok {
+		ext = info.Ext
 	}
 	return fmt.Sprintf("%s_%s_%dfps_%dbps_%ds%s", c.GradientType, c.Resolution, c.Framerate, c.Bitrate, c.Duration, ext)
 }
@@ -29,11 +30,11 @@ func GetDefaultConfig() VideoConfig {
 		Duration:     30,
 		NbColors:     4,
 		Speed:        0.08,
-		GradientType: "radial",
+		GradientType: GradientRadial,
 		LinearAngle:  0,
 		FontColor:    "black",
 		Colors:       []Color{"546b41", "99ad7a", "dcccac", "fff8ec"},
-		Engine:       "native",
+		Engine:       EngineNative,
 	}
 }
 
@@ -57,6 +58,32 @@ func ReadConfigFile(p *string) (cfg VideoConfig, err error) {
 
 	cfg.cyclePalette()
 	return
+}
+
+// Load builds a ready-to-use config: defaults, or the JSON file at path when
+// path is non-empty; then validates it and resolves the output path.
+func Load(path string) (cfg VideoConfig, err error) {
+	if path == "" {
+		cfg = GetDefaultConfig()
+	} else {
+		path, err = filepath.Abs(path)
+		if err != nil {
+			return cfg, err
+		}
+
+		cfg, err = ReadConfigFile(&path)
+		if err != nil {
+			return cfg, err
+		}
+	}
+
+	if err = cfg.Validate(); err != nil {
+		return cfg, err
+	}
+
+	err = cfg.CalcOutputPath()
+
+	return cfg, err
 }
 
 // nextAvailableFilename returns the first free automatic file name: the

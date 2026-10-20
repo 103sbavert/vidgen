@@ -36,6 +36,11 @@ func (c *VideoConfig) cyclePalette() {
 	c.Colors = cycled
 }
 
+// TotalFrames is the number of frames in the clip (framerate * duration).
+func (c VideoConfig) TotalFrames() int {
+	return c.Framerate * c.Duration
+}
+
 // Size returns the width and height encoded in the resolution string (WxH).
 func (r VideoResolution) Size() (w, h int, err error) {
 	m := RegexPatterns.resolutionRegex.FindStringSubmatch(string(r))

@@ -13,6 +13,19 @@ const (
 	ExtWebp = ".webp"
 )
 
+// Frame generators selectable through VideoConfig.Engine. Keep in sync with
+// the `oneof` validation tag on that field.
+const (
+	EngineNative = "native"
+	EngineGeq    = "geq"
+)
+
+// Gradient types selectable through VideoConfig.GradientType. Keep in sync
+// with the `oneof` validation tag on that field.
+const (
+	GradientRadial = "radial"
+)
+
 var colorKeywords = map[string]string{
 	"black": "222222",
 	"white": "eeeeee",
@@ -21,37 +34,51 @@ var colorKeywords = map[string]string{
 	"blue":  "2222ee",
 }
 
-var codecExtMap = map[string]string{
-	"libx264":           ExtMp4,
-	"h264_nvenc":        ExtMp4,
-	"h264_amf":          ExtMp4,
-	"h264_qsv":          ExtMp4,
-	"h264_videotoolbox": ExtMp4,
-	"libx265":           ExtMp4,
-	"hevc_nvenc":        ExtMp4,
-	"hevc_amf":          ExtMp4,
-	"hevc_qsv":          ExtMp4,
-	"hevc_videotoolbox": ExtMp4,
-	"libvpx":            ExtWebm,
-	"libvpx-vp9":        ExtWebm,
-	"vp9_qsv":           ExtWebm,
-	"libaom-av1":        ExtMp4,
-	"libsvtav1":         ExtMp4,
-	"av1_nvenc":         ExtMp4,
-	"av1_amf":           ExtMp4,
-	"av1_qsv":           ExtMp4,
-	"mpeg2video":        ExtMpg,
-	"mpeg2_qsv":         ExtMpg,
-	"mpeg4":             ExtMp4,
-	"libxvid":           ExtAvi,
-	"prores":            ExtMov,
-	"prores_ks":         ExtMov,
-	"dnxhd":             ExtMxf,
-	"libtheora":         ExtOgv,
-	"mjpeg":             ExtAvi,
-	"mjpeg_qsv":         ExtAvi,
-	"libwebp":           ExtWebp,
-	"libwebp_anim":      ExtWebp,
+// CodecInfo is what vidgen knows about an ffmpeg video encoder.
+type CodecInfo struct {
+	Ext            string
+	SplitByDefault bool
+}
+
+// codecs lists every encoder accepted by config validation.
+var codecs = map[string]CodecInfo{
+	"libx264":           {Ext: ExtMp4},
+	"h264_nvenc":        {Ext: ExtMp4},
+	"h264_amf":          {Ext: ExtMp4},
+	"h264_qsv":          {Ext: ExtMp4},
+	"h264_videotoolbox": {Ext: ExtMp4},
+	"libx265":           {Ext: ExtMp4},
+	"hevc_nvenc":        {Ext: ExtMp4},
+	"hevc_amf":          {Ext: ExtMp4},
+	"hevc_qsv":          {Ext: ExtMp4},
+	"hevc_videotoolbox": {Ext: ExtMp4},
+	"libvpx":            {Ext: ExtWebm, SplitByDefault: true},
+	"libvpx-vp9":        {Ext: ExtWebm, SplitByDefault: true},
+	"vp9_qsv":           {Ext: ExtWebm},
+	"libaom-av1":        {Ext: ExtMp4, SplitByDefault: true},
+	"libsvtav1":         {Ext: ExtMp4},
+	"av1_nvenc":         {Ext: ExtMp4},
+	"av1_amf":           {Ext: ExtMp4},
+	"av1_qsv":           {Ext: ExtMp4},
+	"mpeg2video":        {Ext: ExtMpg},
+	"mpeg2_qsv":         {Ext: ExtMpg},
+	"mpeg4":             {Ext: ExtMp4},
+	"libxvid":           {Ext: ExtAvi},
+	"prores":            {Ext: ExtMov},
+	"prores_ks":         {Ext: ExtMov},
+	"dnxhd":             {Ext: ExtMxf},
+	"libtheora":         {Ext: ExtOgv},
+	"mjpeg":             {Ext: ExtAvi},
+	"mjpeg_qsv":         {Ext: ExtAvi},
+	"libwebp":           {Ext: ExtWebp},
+	"libwebp_anim":      {Ext: ExtWebp},
+}
+
+// LookupCodec returns what is known about the named encoder.
+func LookupCodec(name string) (CodecInfo, bool) {
+	info, ok := codecs[name]
+
+	return info, ok
 }
 
 var RegexPatterns = regexPatterns{

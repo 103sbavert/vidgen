@@ -47,11 +47,11 @@ func getValidator() *validator.Validate {
 			return RegexPatterns.colorRegex.MatchString(colorStr)
 		})
 
-		// Register custom validation for VideoCodec name against validCodecs map
+		// Register custom validation for the codec name against the codecs table
 		validate.RegisterValidation("codec", func(fl validator.FieldLevel) bool {
 			val := fl.Field().String()
 
-			_, ok := codecExtMap[val]
+			_, ok := LookupCodec(val)
 			return ok
 		})
 	})
