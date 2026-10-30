@@ -27,8 +27,9 @@ func (c *Color) UnmarshalJSON(data []byte) error {
 	s = strings.TrimPrefix(s, "#")
 	s = strings.ToLower(s)
 
-	if colorKeywords[s] != "" {
-		s = colorKeywords[s]
+	color, ok := colorKeywords[s]
+	if ok {
+		s = color
 	}
 
 	*c = Color(s)
