@@ -14,11 +14,11 @@ const (
 )
 
 var colorKeywords = map[string]string{
-	"black": "222222",
-	"white": "eeeeee",
-	"red":   "ee2222",
-	"green": "22ee22",
-	"blue":  "2222ee",
+	"black": "#222222",
+	"white": "#eeeeee",
+	"red":   "#ee2222",
+	"green": "#22ee22",
+	"blue":  "#2222ee",
 }
 
 var codecExtMap = map[string]string{
@@ -56,5 +56,5 @@ var codecExtMap = map[string]string{
 
 var RegexPatterns = regexPatterns{
 	resolutionRegex: regexp.MustCompile(`^(\d{3,4})x(\d{3,4})$`),
-	colorRegex:      regexp.MustCompile(`^#?([0-9a-fA-F]{6})$`),
+	colorRegex:      regexp.MustCompile(`^#([0-9a-fA-F]{6})$`),
 }
