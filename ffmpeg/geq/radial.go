@@ -63,7 +63,7 @@ func boundaryConstants(k, N int) (intercept, slope float64) {
 	target := boundaryIndex / totalRings
 	slope = target - intercept
 
-	return intercept, slope
+	return
 }
 
 // colorDeltas computes, for each fence between adjacent rings, the RGB shift
@@ -219,33 +219,38 @@ func buildChannelExpr(baseVal int, deltas []int16, N int, sigma float64, duratio
 //	"geq=r='...':g='...':b='..."
 //
 // Returns an error if any color string is malformed or Colors slice is empty.
-func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
+func BuildRadialGeq(cfg config.VideoConfig) (geq string, err error) {
 	N := len(cfg.Colors)
 
 	if N == 0 {
-		return "", fmt.Errorf("no colors provided")
+		err = fmt.Errorf("no colors provided")
+		return
 	}
 
 	if N == 1 {
-		return "", fmt.Errorf("need at least 2 colors for a gradient")
+		err = fmt.Errorf("need at least 2 colors for a gradient")
+		return
 	}
 
 	// Get the innermost color (last in the slice)
 	innermost := cfg.Colors[N-1]
 	innerR, innerG, innerB, err := innermost.ParseHex()
 	if err != nil {
-		return "", fmt.Errorf("invalid innermost color %s: %w", innermost, err)
+		err = fmt.Errorf("invalid innermost color %s: %w", innermost, err)
+		return
 	}
 
 	// Compute all fence deltas
 	deltas, errors := colorDeltas(cfg.Colors)
+
 	if len(errors) > 0 {
-		// Aggregate errors
-		return "", fmt.Errorf("color parsing errors: %v", errors)
+		err = fmt.Errorf("color parsing errors: %v", errors)
+		return
 	}
 
 	if len(deltas) != N-1 {
-		return "", fmt.Errorf("expected %d deltas, got %d", N-1, len(deltas))
+		err = fmt.Errorf("expected %d deltas, got %d", N-1, len(deltas))
+		return
 	}
 
 	// Extract per-channel deltas
@@ -263,5 +268,6 @@ func BuildRadialGeq(cfg config.VideoConfig) (string, error) {
 	gExpr := buildChannelExpr(int(innerG), deltaG, N, sigma, cfg.Duration)
 	bExpr := buildChannelExpr(int(innerB), deltaB, N, sigma, cfg.Duration)
 
-	return fmt.Sprintf("geq=r='%s':g='%s':b='%s'", rExpr, gExpr, bExpr), nil
+	geq = fmt.Sprintf("geq=r='%s':g='%s':b='%s'", rExpr, gExpr, bExpr)
+	return
 }
